@@ -1,0 +1,47 @@
+{
+  "task_id": "93c4c6d4-86b8-4d15-bd6b-e63fd001a893",
+  "type": "multiview_to_model",
+  "status": "success",
+  "input": {
+    "pbr": false,
+    "quad": true,
+    "files": [
+      {
+        "object": {
+          "key": "tcli_101a274cd18d4334928658c025afb1d4/20261123/594cee11-018f-4506-9435-834d07ef3ed2/file.png",
+          "bucket": "tripo-data"
+        }
+      },
+      {
+        "object": {
+          "key": "tcli_101a274cd18d4334928658c025afb1d4/20261123/5b1b8d5f-2526-4840-978a-68366a1ed49b/file.png",
+          "bucket": "tripo-data"
+        }
+      },
+      {
+        "object": {
+          "key": "tcli_101a274cd18d4334928658c025afb1d4/20261123/6297da6f-2bcb-4797-93d6-b3df5b725e54/file.png",
+          "bucket": "tripo-data"
+        }
+      },
+      null
+    ],
+    "delight": false,
+    "texture": true,
+    "export_uv": true,
+    "model_version": "P2-20260801",
+    "texture_version": "v3.5-20260815"
+  },
+  "output_fields": [
+    "model_url",
+    "rendered_image_url"
+  ],
+  "credits_consumed": 110,
+  "created_at": "2026-11-23T21:33:58.636027Z",
+  "completed_at": "2026-11-23T21:34:48.009388Z",
+  "files": [
+    "model.fbx",
+    "rendered_image.webp",
+    "preview.png"
+  ]
+}
