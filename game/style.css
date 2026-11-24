@@ -55,7 +55,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .tag i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
 .meter { height: 7px; border-radius: 4px; background: #2b2930; overflow: hidden; }
 .meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
-.meter.warn span { background: #e5484d; }
+.meter.warn span { background: #e5484d; animation: blink 0.8s steps(2, jump-none) infinite; }
+#cableUsed.warn { color: #ff6b70; font-weight: 600; animation: blink 0.8s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .meter.warn span, #cableUsed.warn { animation: none; }
+}
 .status { display: inline-flex; align-items: center; gap: 6px; }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #5fd37a; box-shadow: 0 0 6px #5fd37a; }
 .status.idle::before { background: var(--hazard); box-shadow: 0 0 6px var(--hazard); }

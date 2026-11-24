@@ -13,7 +13,7 @@ const START = new THREE.Vector3(-9.45, 0, 0);
 const SOCKET_POS = new THREE.Vector3(-ROOM.x, 0.75, 0);
 const WALL_H = 1.3, WALL_T = 0.26;
 
-const PACE = 2;                      // walk cycle playback rate; ground speed follows it
+const PACE = 6;                      // walk cycle playback rate; ground speed follows it
 const WALK_SPEED = 0.22 * PACE;      // matches the foot slide of the walk cycle, so feet don't skate
 const TURN_RATE = THREE.MathUtils.degToRad(120);
 const BOT_R = 0.3;                   // footprint radius against walls
@@ -1375,9 +1375,10 @@ function segmentHitsBox(a, b, w) {
 }
 const _sight = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 function fadeBlockers() {
+  // Only sight lines to the bot himself (feet, middle, head): walls ahead of him never fade.
   _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
   _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
-  _sight[2].copy(camLook);
+  _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
   for (const w of walls) setGhost(w, follow && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
 }
 function updateCamera(dt, snap) {
@@ -1498,10 +1499,15 @@ renderer.setAnimationLoop(() => {
     // The gauge shows the cable still on the reel: full at the start, empty when the plug pulls out.
     const left = unplugged ? 0 : Math.max(0, rope.len - state.taut);
     const low = left < Math.max(1.5, rope.len * 0.15);
-    if (game.test !== null) $("cableLen").textContent = `${Math.min(state.taut, rope.len).toFixed(1)} / ${rope.len.toFixed(1)} m`;
+    if (game.test !== null) {
+      $("cableUsed").textContent = Math.min(state.taut, rope.len).toFixed(1);
+      $("cableTotal").textContent = ` / ${rope.len.toFixed(1)} m`;
+    }
     $("meter").style.width = ((left / rope.len) * 100).toFixed(0) + "%";
-    $("meterBox").classList.toggle("warn", low);
-    $("tension").textContent = unplugged ? "—" : `${left.toFixed(1)} m`;
+    // Nearly out: the bar and the cable-used figure blink red together.
+    const blink = low && !unplugged;
+    $("meterBox").classList.toggle("warn", blink);
+    $("cableUsed").classList.toggle("warn", blink);
     $("toGoal").textContent = Math.max(0, GOAL_X - bot.pos.x).toFixed(1) + " m";
     const run = game.started === null ? 0 : (game.state === "playing" ? game.time - game.started : null);
     if (run !== null) $("clock").textContent = fmt(run);
