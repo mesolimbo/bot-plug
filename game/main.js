@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -116,13 +115,6 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x15171c);
 scene.fog = new THREE.Fog(0x15171c, 26, 60);
 const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 200);
-camera.position.set(-10.4, 3.6, 4.2);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.maxPolarAngle = THREE.MathUtils.degToRad(86);
-controls.minDistance = 1.5;
-controls.maxDistance = 30;
-controls.target.set(-9, 0.5, 0);
 
 const gradient = new THREE.DataTexture(new Uint8Array([70, 150, 255]), 3, 1, THREE.RedFormat);
 gradient.minFilter = gradient.magFilter = THREE.NearestFilter;
@@ -1241,6 +1233,7 @@ function startTest(k) {
   power = 1;
   bot.pos.copy(START); bot.heading = 0; bot.weight = 0;
   botRoot.position.copy(bot.pos); botRoot.rotation.y = 0;
+  updateCamera(0, true);
   restorePose(); mixer.update(0); savePose();
   keys.clear();
   rope = makeRope(t.len);
@@ -1323,16 +1316,92 @@ $("menuBtn").onclick = showMenu;
 $("restart").onclick = () => { if (game.test !== null) startTest(game.test); };
 
 // --- Camera and controls -------------------------------------------------------------------------
-let follow = true;
+// Follow: over the bot's shoulder, just above the wall tops, turning as he turns.
+// Overhead: looking almost straight down on him; the scroll wheel raises and lowers it, never so high
+// that the whole maze fits in view.
+const FOLLOW_UP = 1.85, FOLLOW_BACK = 2.3, FOLLOW_AHEAD = 1.0;
+const OVERHEAD_MIN = 3.5, OVERHEAD_TILT = 0.12; // tilt: sideways offset per metre of height (about 83 degrees)
+let follow = true, camYaw = 0, overheadH = 6;
+const camLook = new THREE.Vector3(), camGoalPos = new THREE.Vector3(), camGoalLook = new THREE.Vector3();
+function overheadMax() {
+  // Highest the camera may go while the view stays narrower than the maze in both directions.
+  const v = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  return Math.min(ROOM.h - 2.8, (COLS * CELL * 0.8) / (v * camera.aspect), (ROWS * CELL * 0.8) / v);
+}
+function camGoal() {
+  if (follow) {
+    const fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
+    camGoalPos.set(bot.pos.x - fx * FOLLOW_BACK, FOLLOW_UP, bot.pos.z - fz * FOLLOW_BACK);
+    camGoalLook.set(bot.pos.x + fx * FOLLOW_AHEAD, 0.45, bot.pos.z + fz * FOLLOW_AHEAD);
+  } else {
+    camGoalPos.set(bot.pos.x, overheadH, bot.pos.z + overheadH * OVERHEAD_TILT);
+    camGoalLook.set(bot.pos.x, 0, bot.pos.z);
+  }
+  camGoalPos.x = THREE.MathUtils.clamp(camGoalPos.x, -ROOM.x + 0.3, ROOM.x - 0.3);
+  camGoalPos.z = THREE.MathUtils.clamp(camGoalPos.z, -ROOM.z + 0.3, ROOM.z - 0.3);
+}
+// In Follow, walls between the camera and the bot fade so they never hide him.
+const ghosts = new Map();
+function ghostOf(mat) {
+  if (!ghosts.has(mat)) {
+    const g = mat.clone();
+    g.transparent = true; g.opacity = 0.28; g.depthWrite = false;
+    ghosts.set(mat, g);
+  }
+  return ghosts.get(mat);
+}
+function setGhost(w, on) {
+  if (!!w.ghost === on) return;
+  w.ghost = on;
+  for (const o of [w.mesh, ...w.mesh.children]) {
+    if (o.isLineSegments) { o.visible = !on; continue; }
+    if (!o.userData.solid) o.userData.solid = o.material;
+    o.material = on ? ghostOf(o.userData.solid) : o.userData.solid;
+  }
+  w.mesh.castShadow = !on;
+}
+function segmentHitsBox(a, b, w) {
+  let t0 = 0, t1 = 1;
+  const lo = [w.minX - 0.02, 0, w.minZ - 0.02], hi = [w.maxX + 0.02, (w.h + 0.08) * w.rise, w.maxZ + 0.02];
+  const p = [a.x, a.y, a.z], d = [b.x - a.x, b.y - a.y, b.z - a.z];
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(d[k]) < 1e-9) { if (p[k] < lo[k] || p[k] > hi[k]) return false; continue; }
+    let ta = (lo[k] - p[k]) / d[k], tb = (hi[k] - p[k]) / d[k];
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+const _sight = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function fadeBlockers() {
+  _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
+  _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
+  _sight[2].copy(camLook);
+  for (const w of walls) setGhost(w, follow && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
+}
+function updateCamera(dt, snap) {
+  camYaw += angleDiff(bot.heading, camYaw) * (snap ? 1 : 1 - Math.exp(-dt * 3));
+  overheadH = THREE.MathUtils.clamp(overheadH, OVERHEAD_MIN, overheadMax());
+  camGoal();
+  const k = snap ? 1 : 1 - Math.exp(-dt * 5);
+  camera.position.lerp(camGoalPos, k);
+  camLook.lerp(camGoalLook, k);
+  camera.lookAt(camLook);
+  fadeBlockers();
+}
 function setCam(mode) {
   follow = mode === "follow";
   $("camFollow").setAttribute("aria-pressed", String(follow));
-  $("camOverview").setAttribute("aria-pressed", String(!follow));
-  if (!follow) { controls.target.set(0, 0, 0.6); camera.position.set(0.01, ROOM.h - 2.7, ROOM.z - 0.5); }
-  else { controls.target.set(bot.pos.x, 0.5, bot.pos.z); camera.position.set(bot.pos.x - 2.6, 3.4, bot.pos.z + 3.6); }
+  $("camOverhead").setAttribute("aria-pressed", String(!follow));
+  $("camFollow").blur(); $("camOverhead").blur();
 }
 $("camFollow").onclick = () => setCam("follow");
-$("camOverview").onclick = () => setCam("overview");
+$("camOverhead").onclick = () => setCam("overhead");
+renderer.domElement.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  if (!follow) overheadH = THREE.MathUtils.clamp(overheadH * Math.exp(e.deltaY * 0.0012), OVERHEAD_MIN, overheadMax());
+}, { passive: false });
 function setDrive(isManual) {
   manual = isManual;
   keys.clear();
@@ -1379,11 +1448,11 @@ buildWalls(TESTS[0]);
 for (const w of walls) { w.rise = 1; w.mesh.position.y = w.h / 2; }
 layCable();
 $("loading").remove();
+updateCamera(0, true);
 showMenu();
 
 // --- Loop --------------------------------------------------------------------------------------
 const clock = new THREE.Clock();
-const lookAt = new THREE.Vector3();
 let hudTimer = 0;
 let state = cableState();
 renderer.setAnimationLoop(() => {
@@ -1419,28 +1488,7 @@ renderer.setAnimationLoop(() => {
   cableInk.update(frames);
   updateBands();
 
-  if (follow) {
-    lookAt.set(bot.pos.x, 0.5, bot.pos.z);
-    const k = 1 - Math.exp(-dt * 2.5);
-    const delta = lookAt.sub(controls.target).multiplyScalar(k);
-    controls.target.add(delta);
-    camera.position.add(delta);
-  }
-  // Stop zooming out at the room's walls along the current view, so the controls never pull the camera
-  // somewhere the clamp below then pushes it back from.
-  {
-    const dir = _v.subVectors(camera.position, controls.target).normalize(), t = controls.target;
-    let reach = 30;
-    for (const [a, lo, hi] of [["x", -ROOM.x + 0.4, ROOM.x - 0.4], ["y", 0.3, ROOM.h - 2.6], ["z", -ROOM.z + 0.4, ROOM.z - 0.4]]) {
-      if (dir[a] > 1e-6) reach = Math.min(reach, (hi - t[a]) / dir[a]);
-      else if (dir[a] < -1e-6) reach = Math.min(reach, (lo - t[a]) / dir[a]);
-    }
-    controls.maxDistance = Math.max(controls.minDistance, reach);
-  }
-  controls.update();
-  camera.position.x = THREE.MathUtils.clamp(camera.position.x, -ROOM.x + 0.4, ROOM.x - 0.4);
-  camera.position.z = THREE.MathUtils.clamp(camera.position.z, -ROOM.z + 0.4, ROOM.z - 0.4);
-  camera.position.y = THREE.MathUtils.clamp(camera.position.y, 0.3, ROOM.h - 2.6);
+  updateCamera(dt, false);
   sun.position.set(bot.pos.x + 5, 12, bot.pos.z + 4);
   sun.target.position.copy(bot.pos);
 
