@@ -1,0 +1,136 @@
+/* Layout: one-screen game. The test floor fills the screen; a status plate sits top-left,
+   a control rail docks at the bottom, and the menu and results cards float over the floor. */
+:root {
+  color-scheme: dark;
+  --ground: #101216;
+  --panel: rgba(24, 25, 30, 0.88);
+  --line: #3a3740;
+  --ink: #ece6da;
+  --muted: #9b958b;
+  --hazard: #f2b705;
+  --accent: #2fbf71;
+  --display: "Chakra Petch", "Bahnschrift", "Arial Narrow", sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  display: flex;
+  flex-direction: column;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+.stage {
+  position: relative; flex: 1; min-height: 400px;
+  border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--line); background: #15171c;
+  touch-action: none;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.plate {
+  position: absolute; top: 14px; left: 14px;
+  display: grid; gap: 8px; padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  pointer-events: none; min-width: 220px;
+}
+.plate h1 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.stripe { height: 5px; width: 84px; border-radius: 1px;
+  background: repeating-linear-gradient(-45deg, var(--hazard) 0 7px, #1a1a1a 7px 14px); }
+.readout { display: grid; grid-template-columns: auto auto; gap: 3px 14px; margin: 0;
+  font-family: var(--mono); font-size: 0.78rem; }
+.readout dt { color: var(--muted); }
+.readout dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.tag { display: inline-flex; align-items: center; gap: 6px; }
+.tag i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.meter { height: 7px; border-radius: 4px; background: #2b2930; overflow: hidden; }
+.meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+.meter.warn span { background: #e5484d; }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #5fd37a; box-shadow: 0 0 6px #5fd37a; }
+.status.idle::before { background: var(--hazard); box-shadow: 0 0 6px var(--hazard); }
+.status.off::before { background: #e5484d; box-shadow: 0 0 6px #e5484d; }
+
+.rail {
+  position: absolute; left: 12px; right: 12px; bottom: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  padding: 9px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+button {
+  font: 500 0.85rem var(--body); color: var(--ink);
+  background: #2b2930; border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 11px; cursor: pointer;
+}
+button:hover { background: #35323b; }
+button[aria-pressed="true"] { background: var(--hazard); border-color: var(--hazard); color: #18160f; }
+button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; }
+.seg button:first-child { border-radius: 7px 0 0 7px; }
+.seg button:last-child { border-radius: 0 7px 7px 0; border-left: 0; }
+.hint { font-size: 0.78rem; color: var(--muted); }
+
+/* Menu and results cards */
+.overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  background: rgba(10, 11, 14, 0.55);
+}
+.card {
+  width: min(760px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+  background: rgba(22, 23, 28, 0.96); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 24px; display: grid; gap: 16px;
+}
+.card.small { width: min(420px, 100%); }
+.brand { display: grid; gap: 6px; }
+.brand h2 {
+  margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: 0.02em;
+  font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1; text-wrap: balance;
+}
+.brand h2 em { font-style: normal; color: var(--hazard); }
+.brand p { margin: 0; color: var(--muted); max-width: 60ch; line-height: 1.5; font-size: 0.92rem; }
+.tests { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+.test {
+  text-align: left; display: grid; gap: 8px; padding: 12px; border-radius: 10px;
+  background: #1d1c22; border: 1px solid var(--line);
+}
+.test:hover { background: #26242c; border-color: #57525e; }
+.coil { height: 34px; }
+.test b { font-family: var(--display); font-size: 1rem; letter-spacing: 0.04em; }
+.test small { font-family: var(--mono); color: var(--muted); font-size: 0.72rem; }
+.pips { display: flex; gap: 3px; }
+.pips span { width: 12px; height: 4px; border-radius: 2px; background: #3a3740; }
+.pips span.on { background: var(--c); }
+.best { font-family: var(--mono); font-size: 0.72rem; }
+.best.pass { color: #5fd37a; }
+.keys { color: var(--muted); font-size: 0.8rem; }
+.keys kbd {
+  font-family: var(--mono); font-size: 0.75rem; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--line); background: #222128; color: var(--ink);
+}
+.verdict { font-family: var(--display); font-weight: 700; font-size: 2.2rem; letter-spacing: 0.08em; margin: 0; }
+.verdict.pass { color: #5fd37a; }
+.verdict.fail { color: #e5484d; }
+.stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; margin: 0; font-family: var(--mono); font-size: 0.85rem; }
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions .primary { background: var(--hazard); border-color: var(--hazard); color: #18160f; font-weight: 600; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 0.85rem; color: var(--muted); pointer-events: none; }
+@media (max-width: 560px) {
+  .plate { min-width: 0; padding: 9px 11px; }
+  .hint { display: none; }
+}
