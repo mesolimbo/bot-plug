@@ -427,8 +427,8 @@ function makeRope(len) {
   return { n, seg: len / n, len, a: 0, P: new Float32Array((n + 1) * 3) };
 }
 const cableDrops = () => wallEnd.y + 0.5; // socket height down to the floor, and up to the bot's plug
-const SOCKET_OUT = 0.05, SOCKET_BEND = 0.25;
-const socketFoot = () => new THREE.Vector2(wallEnd.x + SOCKET_OUT + 2 * SOCKET_BEND, wallEnd.z);
+const SOCKET_DROP = 0.9; // length of cable over which it drops from the socket to the floor
+const socketFoot = () => new THREE.Vector2(wallEnd.x + 0.05, wallEnd.z);
 const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const cross2 = (ax, az, bx, bz) => ax * bz - az * bx;
 
@@ -682,23 +682,16 @@ function simRope(dt) {
   if (!ropeFree) winding = ropeWinding();
 }
 
-// The rope in 3D: out of the socket and down to the floor, along the floor, then up to the plug. Near
-// the bot it stays at plug height while it's wound round him, then drops in one smooth curve.
+// The rope in 3D. It drops from the socket in one smooth curve, runs along the floor, and rises to the
+// plug the same way; near the bot it stays at plug height while it's wound round him. When the ends are
+// too close for both drops to reach the floor, the cable hangs between them in one sag.
 function cablePoints() {
-  const out = [], m = rp.length;
-  // Straight out of the socket, round a bend down, hang, and round a bend onto the floor.
-  const x0 = wallEnd.x + SOCKET_OUT, z0 = wallEnd.z, R = SOCKET_BEND;
-  out.push(wallEnd.clone());
-  for (let k = 0; k <= 8; k++) {
-    const a = (k / 8) * (Math.PI / 2);
-    out.push(new THREE.Vector3(x0 + R * Math.sin(a), wallEnd.y - R + R * Math.cos(a), z0));
-  }
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * (Math.PI / 2);
-    out.push(new THREE.Vector3(x0 + 2 * R - R * Math.cos(a), CABLE_R + R - R * Math.sin(a), z0));
-  }
-  const arc = new Float32Array(m);
+  const out = [wallEnd.clone()], m = rp.length;
+  const arc = new Float32Array(m), fromHead = new Float32Array(m);
   for (let i = m - 2; i >= 0; i--) arc[i] = arc[i + 1] + rp[i].distanceTo(rp[i + 1]);
+  for (let i = 1; i < m; i++) fromHead[i] = fromHead[i - 1] + rp[i].distanceTo(rp[i - 1]);
+  const smooth = (t) => 1 - t * t * (3 - 2 * t);
+  const head = (i) => wallEnd.y * smooth(Math.min(1, fromHead[i] / SOCKET_DROP));
   const h = new Float32Array(m);
   if (!ropeFree) {
     let sc = 0;
@@ -716,6 +709,12 @@ function cablePoints() {
     // The freed end falls to the floor.
     const H = botEnd.y * Math.max(0, 1 - fallT / 0.3) ** 2;
     for (let i = 0; i < m; i++) { const t = Math.min(1, arc[i] / 0.8); h[i] = H * (1 - t * t * (3 - 2 * t)); }
+  }
+  // Join the socket's drop with the plug's: a smooth maximum, so where they overlap there's no crease.
+  for (let i = 0; i < m; i++) {
+    const a = head(i), b = h[i], k = Math.min(0.1, 2 * Math.min(a, b));
+    const w = k > 1e-6 ? Math.max(0, k - Math.abs(a - b)) / k : 0;
+    h[i] = Math.max(a, b) + w * w * k * 0.25;
   }
   // Two light smoothing passes over the drawn copy round off what's left of the link-to-link corners;
   // they move points by millimetres, well inside the wall margin.
@@ -737,6 +736,7 @@ function drawCable(dt) {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
   const total = cum[cum.length - 1];
+  rope.drawn = total;
   const { n, P } = rope;
   let s = 0;
   for (let i = 0; i <= n; i++) {
@@ -825,7 +825,7 @@ function buildFrames() {
 const cableMat = toon({ color: 0x2fbf71 });
 const inkMat = new THREE.MeshBasicMaterial({ color: 0x101114, side: THREE.BackSide });
 const bandMat = toon({ color: 0xa2a8b2 });
-let cable = null, cableInk = null, bands = null, bandEvery = 14;
+let cable = null, cableInk = null, bands = null;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _one = new THREE.Vector3(1, 1, 1);
 function buildCableMeshes() {
   if (cable) { cable.dispose(); cableInk.dispose(); scene.remove(bands); bands.dispose(); }
@@ -834,18 +834,21 @@ function buildCableMeshes() {
   cable.mesh.castShadow = true;
   cableInk = new Tube(n, CABLE_R + 0.006, 8, inkMat);
   scene.add(cable.mesh, cableInk.mesh);
-  bandEvery = Math.round(1.6 / rope.seg);
-  const count = Math.max(1, Math.floor((n - 4) / bandEvery));
+  const count = Math.max(1, Math.ceil(rope.len * 1.1 / BAND_GAP));
   bands = new THREE.InstancedMesh(new THREE.CylinderGeometry(CABLE_R * 1.45, CABLE_R * 1.45, 0.045, 14), bandMat, count);
   bands.castShadow = true; bands.frustumCulled = false;
   scene.add(bands);
   frames = Array.from({ length: n + 1 }, () => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3() }));
 }
+// A band every BAND_GAP metres along the cable as drawn; bands past the plug end are hidden.
+const BAND_GAP = 1.6, _zero = new THREE.Vector3(0, 0, 0);
 function updateBands() {
+  const total = rope.drawn || rope.len;
   for (let k = 0; k < bands.count; k++) {
-    const f = frames[Math.max(rope.a, Math.min(rope.n - 2, 2 + (k + 1) * bandEvery))];
+    const d = (k + 1) * BAND_GAP;
+    const f = frames[Math.max(rope.a, Math.min(rope.n - 2, Math.round((d / total) * rope.n)))];
     _q.setFromUnitVectors(_up, f.t);
-    _m.compose(f.p, _q, _one);
+    _m.compose(f.p, _q, d < total - 0.4 ? _one : _zero);
     bands.setMatrixAt(k, _m);
   }
   bands.instanceMatrix.needsUpdate = true;

@@ -41,7 +41,7 @@ def start():
         flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
     log = open(LOGFILE, "ab")
     proc = subprocess.Popen(
-        [sys.executable, "-I", "-m", "http.server", str(PORT), "--bind", HOST, "--directory", GAME],
+        [sys.executable, "-I", os.path.abspath(__file__), "serve"],
         stdout=log, stderr=log, stdin=subprocess.DEVNULL, creationflags=flags,
         start_new_session=os.name != "nt",
     )
@@ -83,6 +83,19 @@ def status():
     return 0
 
 
+def serve():
+    """Serve game/ and tell the browser not to cache, so a reload always picks up edits."""
+    from functools import partial
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+    class NoCache(SimpleHTTPRequestHandler):
+        def end_headers(self):
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+    ThreadingHTTPServer((HOST, PORT), partial(NoCache, directory=GAME)).serve_forever()
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
-    sys.exit({"start": start, "stop": stop, "status": status}[cmd]())
+    sys.exit({"start": start, "stop": stop, "status": status, "serve": serve}[cmd]())
