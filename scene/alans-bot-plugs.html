@@ -644,27 +644,21 @@
   });
 
   // --- Cable: a verlet rope drawn as a tube ---------------------------------------------------------
-  // The cable feeds from a spring reel in the socket housing. Points before index `a` are still on
-  // the reel; point `a` sits at the reel exit. Pulling pays cable out, slack near the wall winds back in,
-  // so the cable out matches the path it lies along. Tension only builds once the reel is empty.
-  let rope = null; // { n, seg, len, a, P, Q, pinned, endSkip }
+  // Drawing buffer for the cable: n + 1 points along its path, rebuilt every frame.
+  let rope = null; // { n, len, a, P }
   function makeRope(len) {
     const n = Math.max(80, Math.round(len / 0.12));
-    const r = { n, seg: len / n, len, a: 0, P: new Float32Array((n + 1) * 3), Q: new Float32Array((n + 1) * 3), pinned: new Uint8Array(n + 1) };
-    r.pinned[n - 1] = r.pinned[n] = 1;
-    r.endSkip = Math.round(1.6 / r.seg);
-    return r;
+    return { n, seg: len / n, len, a: 0, P: new Float32Array((n + 1) * 3) };
   }
   // The cable can't pass through walls, so the length it needs is the bot's walked trail from the
   // socket pulled tight: shortcut wherever there's a clear line of sight, wrap wherever there isn't.
   // Go round an island and the trail wraps it; walk back the way you came and it unwraps.
-  const RETRACT = 0.00045; // metres per substep the reel winds in (about 8 cm/s)
-  let reelTarget = 0;
   function clearLine(a, b, boxes) {
     const minX = Math.min(a.x, b.x), maxX = Math.max(a.x, b.x), minZ = Math.min(a.y, b.y), maxZ = Math.max(a.y, b.y);
     const dx = b.x - a.x, dz = b.y - a.y;
     for (const w of boxes) {
-      const x0 = w.minX + 0.01, x1 = w.maxX - 0.01, z0 = w.minZ + 0.01, z1 = w.maxZ - 0.01;
+      // Keep tight lines 6 cm off every wall, so the cable wrapping a corner never sinks into it.
+      const x0 = w.minX - 0.06, x1 = w.maxX + 0.06, z0 = w.minZ - 0.06, z1 = w.maxZ + 0.06;
       if (maxX < x0 || minX > x1 || maxZ < z0 || minZ > z1) continue;
       let t0 = 0, t1 = 1, hit = true;
       for (const [q, d, lo, hi] of [[a.x, dx, x0, x1], [a.y, dz, z0, z1]]) {
@@ -691,6 +685,66 @@
     return { verts, len };
   }
   const cableDrops = () => wallEnd.y + 0.5; // socket height down to the floor, and up to the bot's plug
+  // The cable is drawn along the tight trail: it drops from the socket, runs the trail's straight
+  // stretches (each one checked clear of every wall), and rises to the bot's plug. It can't pass
+  // through a wall because its path never does. After an unplug the reel winds the loose end back in.
+  let looseEnd = null, rewound = 0, cableOut = 0;
+  function cablePath() {
+    const y = CABLE_R;
+    const floorPts = [new THREE.Vector3(wallEnd.x + 0.3, y, wallEnd.z)];
+    const tr = trail.length > 1 ? trail : [new THREE.Vector2(wallEnd.x, wallEnd.z), new THREE.Vector2(START.x, START.z)];
+    for (let i = 1; i < tr.length; i++) floorPts.push(new THREE.Vector3(tr[i].x, y, tr[i].y));
+    let tail = [];
+    if (looseEnd) {
+      floorPts.push(looseEnd.clone());
+    } else {
+      const back = new THREE.Vector3(botDir.x, 0, botDir.z).normalize();
+      const under = new THREE.Vector3(botEnd.x, y, botEnd.z).addScaledVector(back, 0.3);
+      const inWall = wallList.some((w) => under.x > w.minX && under.x < w.maxX && under.z > w.minZ && under.z < w.maxZ);
+      floorPts.push(inWall ? new THREE.Vector3(bot.pos.x, y, bot.pos.z) : under);
+      tail = [new THREE.Vector3(botEnd.x, botEnd.y * 0.45, botEnd.z).addScaledVector(back, 0.12), botEnd.clone()];
+    }
+    // Round the bends a little. Bends sit at the bot's footprint, at least 0.3 m from any wall,
+    // and the rounding cuts in less than 0.13 m.
+    const round = [floorPts[0]];
+    for (let i = 1; i < floorPts.length - 1; i++) {
+      const a = floorPts[i - 1], b = floorPts[i], c = floorPts[i + 1];
+      const cut1 = Math.min(0.18, a.distanceTo(b) * 0.4), cut2 = Math.min(0.18, b.distanceTo(c) * 0.4);
+      round.push(b.clone().addScaledVector(a.clone().sub(b).normalize(), cut1),
+        b.clone().addScaledVector(c.clone().sub(b).normalize(), cut2));
+    }
+    round.push(floorPts[floorPts.length - 1]);
+    return [wallEnd.clone(), ...round, ...tail];
+  }
+  function drawCable(dt) {
+    let pts = cablePath();
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    let total = cum[cum.length - 1];
+    if (looseEnd) {
+      // Wind the loose end back toward the socket, dragging the plug along the path.
+      rewound = Math.min(rewound + dt * 1.6, Math.max(0, total - 0.8));
+      total -= rewound;
+    }
+    cableOut = total;
+    const { n, P } = rope;
+    let s = 0;
+    for (let i = 0; i <= n; i++) {
+      const d = (i / n) * total;
+      while (s < cum.length - 2 && cum[s + 1] < d) s++;
+      const t = THREE.MathUtils.clamp((d - cum[s]) / Math.max(1e-6, cum[s + 1] - cum[s]), 0, 1);
+      const v = pts[s].clone().lerp(pts[s + 1], t);
+      P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z;
+    }
+    if (looseEnd) {
+      const end = new THREE.Vector3(P[n * 3], P[n * 3 + 1], P[n * 3 + 2]);
+      const prev = new THREE.Vector3(P[(n - 3) * 3], P[(n - 3) * 3 + 1], P[(n - 3) * 3 + 2]);
+      const dir = prev.sub(end).normalize();
+      botPlug.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+      botPlug.position.copy(end).addScaledVector(dir, -PLUG_LEN);
+      botPlug.position.y = PLUG_R;
+    }
+  }
   let trail = [];
   function resetTrail() { trail = [new THREE.Vector2(wallEnd.x, wallEnd.z), new THREE.Vector2(START.x, START.z)]; }
   function trailLength() {
@@ -700,175 +754,9 @@
     if (p.distanceTo(trail[trail.length - 1]) > 0.2) trail.push(p);
     return tight.len + cableDrops();
   }
-  function reel() {
-    const r = rope, { P, Q, seg, n } = r;
-    const outLen = (n - r.a) * seg;
-    if (r.a > 0 && !unplugged && outLen < reelTarget) {
-      // The point at the exit steps one segment out toward the cable; a new point takes its place.
-      const old = r.a, k = old * 3, nk = (old + 1) * 3;
-      const dx = P[nk] - wallEnd.x, dy = P[nk + 1] - wallEnd.y, dz = P[nk + 2] - wallEnd.z;
-      const len = Math.hypot(dx, dy, dz) || 1;
-      P[k] = Q[k] = wallEnd.x + (dx / len) * seg;
-      P[k + 1] = Q[k + 1] = wallEnd.y + (dy / len) * seg;
-      P[k + 2] = Q[k + 2] = wallEnd.z + (dz / len) * seg;
-      r.pinned[old] = 0;
-      r.a--;
-      r.pinned[r.a] = 1;
-      setPoint(r.a, wallEnd);
-      return;
-    }
-    // Wind in when more than a metre is out beyond what the route needs (and all of it once unplugged).
-    if (r.a < n - 3 && (unplugged || outLen > reelTarget + 1)) {
-      // Draw the first free point toward the reel; once it arrives, it's back on the reel.
-      const k = (r.a + 1) * 3;
-      const dx = wallEnd.x - P[k], dy = wallEnd.y - P[k + 1], dz = wallEnd.z - P[k + 2];
-      const dist = Math.hypot(dx, dy, dz);
-      if (dist < seg * 0.5) {
-        r.pinned[r.a] = 0;
-        r.a++;
-        r.pinned[r.a] = 1;
-        setPoint(r.a, wallEnd);
-      } else {
-        const s = RETRACT / dist;
-        P[k] += dx * s; P[k + 1] += dy * s; P[k + 2] += dz * s;
-      }
-    }
-  }
-  function setPoint(i, v) {
-    const { P, Q } = rope;
-    P[i * 3] = Q[i * 3] = v.x; P[i * 3 + 1] = Q[i * 3 + 1] = v.y; P[i * 3 + 2] = Q[i * 3 + 2] = v.z;
-  }
-
-  // The bot as an obstacle for the cable: capsules on its legs and a sphere for its body.
-  const colliders = [];
-  const botCentre = new THREE.Vector3();
-  function addCollider(bone, aModel, bModel, r) {
-    const toBone = (p) => bone.worldToLocal(model.localToWorld(p.clone()));
-    colliders.push({ bone, a: toBone(aModel), b: toBone(bModel), r: r + CABLE_R, wa: new THREE.Vector3(), wb: new THREE.Vector3() });
-  }
-  function updateColliders() {
-    botCentre.set(bot.pos.x, 0.5, bot.pos.z);
-    for (const c of colliders) {
-      c.wa.copy(c.a); c.bone.localToWorld(c.wa);
-      c.wb.copy(c.b); c.bone.localToWorld(c.wb);
-    }
-  }
-  // Walls bucketed on a 1 m grid so each cable point only checks the walls next to it.
+  // Walls standing right now; the trail is pulled tight against these.
   let wallList = [];
-  const GX = W, GZ = D;
-  const wallGrid = Array.from({ length: GX * GZ }, () => []);
-  const gridCell = (x, z) => Math.min(GZ - 1, Math.max(0, Math.floor(z + ROOM.z))) * GX + Math.min(GX - 1, Math.max(0, Math.floor(x + ROOM.x)));
-  function setWallList(list) {
-    wallList = list;
-    for (const c of wallGrid) c.length = 0;
-    for (const w of list) {
-      const x0 = Math.max(0, Math.floor(w.minX - 0.1 + ROOM.x)), x1 = Math.min(GX - 1, Math.floor(w.maxX + 0.1 + ROOM.x));
-      const z0 = Math.max(0, Math.floor(w.minZ - 0.1 + ROOM.z)), z1 = Math.min(GZ - 1, Math.floor(w.maxZ + 0.1 + ROOM.z));
-      for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) wallGrid[iz * GX + ix].push(w);
-    }
-  }
-  function collide() {
-    const { n, P, Q, pinned, a: first } = rope;
-    const cx = botCentre.x, cy = botCentre.y, cz = botCentre.z, R2 = 0.8 * 0.8;
-    for (let i = first; i <= n; i++) {
-      if (pinned[i]) continue;
-      const k = i * 3;
-      let px = P[k], py = P[k + 1], pz = P[k + 2];
-      // Maze walls block the cable at any height. A point that got inside leaves through the
-      // side it came from (its previous position), so the cable can't tunnel across a wall.
-      for (const w of wallGrid[gridCell(px, pz)]) {
-        const x0 = w.minX - CABLE_R, x1 = w.maxX + CABLE_R, z0 = w.minZ - CABLE_R, z1 = w.maxZ + CABLE_R;
-        if (px <= x0 || px >= x1 || pz <= z0 || pz >= z1) continue;
-        const qx = Q[k], qz = Q[k + 2];
-        if (qx <= x0) px = x0;
-        else if (qx >= x1) px = x1;
-        else if (qz <= z0) pz = z0;
-        else if (qz >= z1) pz = z1;
-        else {
-          const dl = px - x0, dr = x1 - px, dn = pz - z0, ds = z1 - pz;
-          const m = Math.min(dl, dr, dn, ds);
-          if (m === dl) px = x0; else if (m === dr) px = x1; else if (m === dn) pz = z0; else pz = z1;
-        }
-      }
-      // The bot's legs and body.
-      if ((px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2 < R2) {
-        for (const c of colliders) {
-          const ax = c.wa.x, ay = c.wa.y, az = c.wa.z;
-          const ex = c.wb.x - ax, ey = c.wb.y - ay, ez = c.wb.z - az;
-          const len2 = ex * ex + ey * ey + ez * ez;
-          const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * ex + (py - ay) * ey + (pz - az) * ez) / len2)) : 0;
-          const qx = px - (ax + ex * t), qy = py - (ay + ey * t), qz = pz - (az + ez * t);
-          const d2 = qx * qx + qy * qy + qz * qz;
-          if (d2 >= c.r * c.r) continue;
-          const d = Math.sqrt(d2) || 1e-6;
-          const push = (c.r - d) / d;
-          px += qx * push; py += qy * push; pz += qz * push;
-        }
-      }
-      P[k] = px; P[k + 1] = Math.max(py, i === n ? PLUG_R : CABLE_R); P[k + 2] = pz;
-    }
-  }
-
-  let friction = 0.25;
-  function simulate(dt, iters) {
-    const { n, seg, P, Q, pinned, a: first } = rope;
-    const g = -9.8 * dt * dt;
-    for (let i = first; i <= n; i++) {
-      if (pinned[i]) continue;
-      const k = i * 3;
-      for (let a = 0; a < 3; a++) {
-        const v = (P[k + a] - Q[k + a]) * 0.995;
-        Q[k + a] = P[k + a];
-        P[k + a] += v + (a === 1 ? g : 0);
-      }
-    }
-    for (let it = 0; it < iters; it++) {
-      // Alternate sweep direction so a pull travels both ways along the cable.
-      const fwd = it % 2 === 0;
-      for (let s = first; s < n; s++) {
-        const i = fwd ? s : n - 1 - (s - first);
-        const a = i * 3, b = a + 3;
-        const dx = P[b] - P[a], dy = P[b + 1] - P[a + 1], dz = P[b + 2] - P[a + 2];
-        const d = Math.hypot(dx, dy, dz) || 1e-6;
-        const wa = pinned[i] ? 0 : 1, wb = pinned[i + 1] ? 0 : 1;
-        if (!wa && !wb) continue;
-        const f = (d - seg) / d / (wa + wb);
-        P[a] += dx * f * wa; P[a + 1] += dy * f * wa; P[a + 2] += dz * f * wa;
-        P[b] -= dx * f * wb; P[b + 1] -= dy * f * wb; P[b + 2] -= dz * f * wb;
-      }
-      for (let i = first + 1; i < n - 1; i++) {
-        const a = i * 3, b = a + 6;
-        const dx = P[b] - P[a], dy = P[b + 1] - P[a + 1], dz = P[b + 2] - P[a + 2];
-        const d = Math.hypot(dx, dy, dz) || 1e-6;
-        const min = seg * 1.9;
-        if (d >= min) continue;
-        const wa = pinned[i] ? 0 : 1, wb = pinned[i + 2] ? 0 : 1;
-        if (!wa && !wb) continue;
-        const f = ((d - min) / d / (wa + wb)) * 0.5;
-        P[a] += dx * f * wa; P[a + 1] += dy * f * wa; P[a + 2] += dz * f * wa;
-        P[b] -= dx * f * wb; P[b + 1] -= dy * f * wb; P[b + 2] -= dz * f * wb;
-      }
-      for (let i = first; i <= n; i++) {
-        if (pinned[i]) continue;
-        const k = i * 3;
-        const fy = i === n ? PLUG_R : CABLE_R;
-        if (P[k + 1] < fy) P[k + 1] = fy;
-        P[k] = THREE.MathUtils.clamp(P[k], -ROOM.x + CABLE_R, ROOM.x - CABLE_R);
-        P[k + 2] = THREE.MathUtils.clamp(P[k + 2], -ROOM.z + CABLE_R, ROOM.z - CABLE_R);
-      }
-      collide();
-    }
-    // Floor friction: a cable lying on concrete drags rather than slides.
-    for (let i = first; i <= n; i++) {
-      if (pinned[i]) continue;
-      const k = i * 3;
-      if (P[k + 1] <= (i === n ? PLUG_R : CABLE_R) + 0.002) {
-        Q[k] += (P[k] - Q[k]) * friction;
-        Q[k + 2] += (P[k + 2] - Q[k + 2]) * friction;
-      }
-    }
-    reel();
-  }
+  function setWallList(list) { wallList = list; }
 
   class Tube {
     constructor(n, radius, radial, material) {
@@ -967,13 +855,7 @@
   // Tension: the length the cable needs against the length it has. 100% pulls the plug.
   let needed = 0;
   function cableState() {
-    const { n, P, len, a: first } = rope;
-    let out = 0;
-    for (let i = first; i < n; i++) {
-      const a = i * 3, b = a + 3;
-      out += Math.hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]);
-    }
-    return { out, taut: needed, tension: Math.min(1.2, needed / len) };
+    return { out: cableOut, taut: needed, tension: Math.min(1.2, needed / rope.len) };
   }
 
   // --- Bot -------------------------------------------------------------------------------------
@@ -1164,13 +1046,9 @@
 
   function updatePins() {
     botRoot.updateMatrixWorld(true);
-    setPoint(rope.a, wallEnd);
-    rope.pinned[rope.a] = 1;
     if (unplugged) return;
     botPlug.localToWorld(botEnd.set(PLUG_LEN, 0, 0));
     botDir.set(1, 0, 0).transformDirection(botPlug.matrixWorld);
-    setPoint(rope.n, botEnd);
-    setPoint(rope.n - 1, botEnd.clone().addScaledVector(botDir, rope.seg));
   }
 
   // --- Unplugging and powering down -----------------------------------------------------------
@@ -1210,14 +1088,9 @@
   function unplug() {
     unplugged = true;
     keys.clear();
-    const { n, P, Q, pinned } = rope;
-    pinned[n] = pinned[n - 1] = 0;
-    const kick = botDir.clone().multiplyScalar(1.6).add(new THREE.Vector3(0, 0.9, 0));
-    const h = 1 / 360;
-    for (const i of [n, n - 1]) {
-      const k = i * 3;
-      Q[k] = P[k] - kick.x * h; Q[k + 1] = P[k + 1] - kick.y * h; Q[k + 2] = P[k + 2] - kick.z * h;
-    }
+    const back = new THREE.Vector3(botDir.x, 0, botDir.z).normalize();
+    looseEnd = new THREE.Vector3(botEnd.x, PLUG_R, botEnd.z).addScaledVector(back, 0.35);
+    rewound = 0;
     botPlug.removeFromParent();
     scene.add(botPlug);
     botPlug.scale.set(1, 1, 1);
@@ -1229,15 +1102,8 @@
     bodyBone.add(botPlug);
     plugInBone.decompose(botPlug.position, botPlug.quaternion, botPlug.scale);
     unplugged = false;
-  }
-  function followLoosePlug() {
-    const { n, P } = rope;
-    const end = new THREE.Vector3(P[n * 3], P[n * 3 + 1], P[n * 3 + 2]);
-    const prev = new THREE.Vector3(P[(n - 1) * 3], P[(n - 1) * 3 + 1], P[(n - 1) * 3 + 2]);
-    const dir = prev.sub(end).normalize();
-    botPlug.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
-    botPlug.position.copy(end).addScaledVector(dir, -PLUG_LEN);
-    botEnd.copy(end);
+    looseEnd = null;
+    rewound = 0;
   }
 
   // Tip the body forward about the hip line when powered down, keeping the feet planted.
@@ -1324,17 +1190,6 @@
   }
   const boneOf = (name) => model.getObjectByName(name.replace(".", "")) || model.getObjectByName(name);
   for (const side of ["L", "R"]) thighs.push(boneOf(`thigh.${side}`));
-  {
-    const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    for (const [side, z] of [["L", -0.103], ["R", 0.106]]) {
-      const hip = V(0.003, -0.05, z), knee = V(0.071, -0.233, z), ankle = V(-0.026, -0.385, z);
-      addCollider(boneOf(`thigh.${side}`), hip, knee, 0.05);
-      addCollider(boneOf(`shin.${side}`), knee, ankle, 0.05);
-      addCollider(boneOf(`foot.${side}`), V(-0.08, -0.445, z), V(0.13, -0.445, z), 0.06);
-    }
-    addCollider(bodyBone, V(0, 0.12, 0), V(0, 0.12, 0), 0.27);
-  }
-
   const socket = socketGltf.scene;
   toonify(socket);
   socket.position.copy(SOCKET_POS);
@@ -1345,34 +1200,12 @@
   wallPlug.updateMatrixWorld(true);
   wallPlug.localToWorld(wallEnd.set(PLUG_LEN, 0, 0));
 
-  // A fresh cable: just enough paid out to droop from the socket to the bot's back, the rest on the reel.
   function layCable() {
-    rope.a = 0;
-    updatePins();
-    updateColliders();
-    const y = CABLE_R;
-    const pts = [wallEnd.clone(), new THREE.Vector3(wallEnd.x + 0.2, y, wallEnd.z),
-      new THREE.Vector3(botEnd.x - 0.25, y, botEnd.z), botEnd.clone()];
-    const cum = [0];
-    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
-    const total = cum[cum.length - 1];
-    const active = Math.min(rope.n, Math.max(6, Math.round(total / rope.seg)));
-    rope.pinned.fill(0);
-    rope.a = rope.n - active;
-    for (let i = 0; i < rope.a; i++) setPoint(i, wallEnd);
-    let s = 0;
-    for (let i = rope.a; i <= rope.n; i++) {
-      const d = ((i - rope.a) / active) * total;
-      while (s < cum.length - 2 && cum[s + 1] < d) s++;
-      const t = (d - cum[s]) / Math.max(1e-6, cum[s + 1] - cum[s]);
-      setPoint(i, pts[s].clone().lerp(pts[s + 1], t));
-    }
-    rope.pinned[rope.n] = rope.pinned[rope.n - 1] = 1;
-    reelTarget = Math.min(rope.len, total * 1.03 + 0.9);
     updatePins();
     setWallList(solidWalls());
-    friction = 0.25;
-    for (let k = 0; k < 120; k++) simulate(1 / 120, 20);
+    resetTrail();
+    looseEnd = null;
+    rewound = 0;
   }
 
   // --- Game state -------------------------------------------------------------------------------
@@ -1400,7 +1233,6 @@
     buildCableMeshes();
     buildWalls(t);
     layCable();
-    resetTrail();
     needed = 0;
     route = []; routeIdx = 0;
     setTimeout(() => { if (game.test === k && game.state === "rising") beginPlay(); }, 1300);
@@ -1553,11 +1385,8 @@
       applySlump(1 - power);
       setPowerLook(power);
       updatePins();
-      updateColliders();
       if (!unplugged && game.state !== "menu") needed = trailLength();
-      reelTarget = Math.min(rope.len, needed * 1.02 + 0.8);
-      for (let s = 0; s < 3; s++) simulate(dt / 3, 30);
-      if (unplugged) followLoosePlug();
+      drawCable(dt);
       updateSparks(dt);
       state = cableState();
       if (game.state === "playing" && !unplugged) {
