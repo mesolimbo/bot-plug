@@ -39,11 +39,11 @@ body {
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* Top-left column: status plate, then the control bar. */
-/* One frosted, blurred backing behind the whole column, with a 10 px margin round the panels. */
+/* One frosted, blurred, dark hazard-yellow backing behind the whole column, 10 px round the panels. */
 .hud {
   position: absolute; top: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 10px;
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
-  background: rgba(12, 13, 16, 0.55); border-radius: 16px;
+  background: rgba(38, 30, 5, 0.86); border-radius: 16px;
   -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
 }
 .plate {
@@ -121,18 +121,18 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
   display: flex; flex-direction: column; align-items: center;
   background: linear-gradient(to top, rgba(10, 11, 14, 0.8), rgba(10, 11, 14, 0) 65%);
 }
-/* The card starts just below the sign, which always fills the top 30% or so of the view, and stops
-   above the control bar. */
-#menu::before { content: ""; flex: 0 1 calc(31% - 10px); }
-#menu::after { content: ""; flex: 0 0 64px; }
+/* The card sits under the sign, which always fills the top 30% or so of the view, with a third of
+   the space left below the sign above it and two thirds below it. */
+#menu::before { content: ""; flex: 1 1 calc(31% - 10px); }
+#menu::after { content: ""; flex: 2 1 16px; }
 #menu .frost { flex: 0 1 auto; min-height: 0; display: flex; width: min(780px, 100%); box-sizing: border-box; }
 #menu .frost .card { width: 100%; }
 /* The same frosted backing as the HUD column, 10 px round the card. */
 .frost {
-  padding: 10px; border-radius: 16px; background: rgba(12, 13, 16, 0.55);
+  padding: 10px; border-radius: 16px; background: rgba(38, 30, 5, 0.86);
   -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
 }
-#menu .card { background: rgba(18, 19, 23, 0.82); }
+#menu .card { background: rgba(18, 19, 23, 0.96); }
 .brand { display: grid; gap: 6px; }
 .brand p { margin: 0 auto; color: var(--muted); line-height: 1.5; font-size: 0.92rem; text-align: center; }
 /* Kept on one line where there's room; it wraps only on narrow screens. */
@@ -186,7 +186,7 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 #result .stats { font-size: 0.78rem; gap: 3px 12px; }
 #result .actions .primary { flex: 1 1 100%; }
 #result .actions button { flex: 1 1 auto; }
-.plate, .rail, #result .card { background: rgba(18, 19, 23, 0.82); }
+.plate, .rail, #result .card { background: rgba(18, 19, 23, 0.96); }
 /* Fold button in the plate's corner: collapses the HUD to just the title and stripe. */
 .fold {
   position: absolute; top: 9px; right: 8px; width: 24px; height: 24px; padding: 0;
