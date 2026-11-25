@@ -1699,9 +1699,9 @@ function segmentHitsBox(a, b, w) {
   return true;
 }
 const _sight = Array.from({ length: 5 }, () => new THREE.Vector3());
-// Never during the opening shot: the walls stay solid until the bot starts. A panel and the posts at its
-// ends fade together, and stay faded a moment after they stop blocking, so the view doesn't flicker
-// between a clear wall and a clear post as the camera moves.
+// Never during the opening shot: the walls stay solid until the bot starts. Only walls between the
+// camera and the bot fade; a panel takes the posts at its ends with it, and faded walls stay faded a
+// moment after they stop blocking, so the view doesn't flicker as the camera moves.
 const FADE_HOLD = 0.35;
 function fadeBlockers() {
   const on = (follow || cheering() || mourning()) && !camIntro;
@@ -1710,20 +1710,31 @@ function fadeBlockers() {
     // Only sight lines to the bot himself (feet, middle, head, and both sides of his body): walls ahead
     // of him never fade.
     const vx = bot.pos.x - camera.position.x, vz = bot.pos.z - camera.position.z, vl = Math.hypot(vx, vz) || 1;
-    const sx = (-vz / vl) * 0.3, sz = (vx / vl) * 0.3;
+    const sx = (-vz / vl) * 0.25, sz = (vx / vl) * 0.25;
     _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
     _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
     _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
     _sight[3].set(bot.pos.x + sx, 0.5, bot.pos.z + sz);
     _sight[4].set(bot.pos.x - sx, 0.5, bot.pos.z - sz);
+    // Only walls that block the view fade, and a post never fades without a panel. A blocking panel takes
+    // the posts at its two ends with it. A post that blocks on its own takes the one panel meeting it
+    // that lies nearest the camera-to-bot line (and that panel's other end post).
     const group = new Set();
+    const addPanel = (pnl) => { group.add(pnl); for (const l of pnl.links || []) group.add(l); };
+    const cx = camera.position.x, cz = camera.position.z, dx = bot.pos.x - cx, dz = bot.pos.z - cz;
+    const dd = dx * dx + dz * dz || 1;
+    const offLine = (w) => {
+      const px = (w.minX + w.maxX) / 2, pz = (w.minZ + w.maxZ) / 2;
+      const t = Math.max(0, Math.min(1, ((px - cx) * dx + (pz - cz) * dz) / dd));
+      return Math.hypot(cx + dx * t - px, cz + dz * t - pz);
+    };
     for (const w of walls) {
       if (!_sight.some((s) => segmentHitsBox(camera.position, s, w))) continue;
+      if (!w.post) { addPanel(w); continue; }
       group.add(w);
-      for (const l of w.links || []) group.add(l);
+      const panels = (w.links || []).filter((l) => !l.post);
+      if (panels.length) addPanel(panels.reduce((a, b) => (offLine(a) <= offLine(b) ? a : b)));
     }
-    // A post that blocks brings in its panels; those panels bring in the posts at their other ends.
-    for (const w of [...group]) if (!w.post) for (const l of w.links || []) group.add(l);
     for (const w of group) w.fadeUntil = now + FADE_HOLD;
   }
   for (const w of walls) setGhost(w, on && (w.fadeUntil || 0) > now);
