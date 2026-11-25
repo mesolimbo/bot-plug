@@ -39,12 +39,15 @@ body {
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* Top-left column: status plate, then the control bar. */
+/* One frosted, blurred backing behind the whole column, with a 10 px margin round the panels. */
 .hud {
-  position: absolute; top: 14px; left: 14px; width: var(--hud-w);
+  position: absolute; top: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 10px;
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+  background: rgba(12, 13, 16, 0.55); border-radius: 16px;
+  -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
 }
 .plate {
-  display: grid; gap: 8px; padding: 12px 14px;
+  position: relative; display: grid; gap: 8px; padding: 12px 14px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   pointer-events: none; width: var(--hud-w); box-sizing: border-box;
 }
@@ -163,11 +166,9 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 /* The status plate and control bar stay hidden while loading, while the menu is up or while the
    opening shot plays; they
    fade in when the level is ready. */
-.plate, .rail { transition: opacity 0.4s; }
-.stage:has(#loading) :is(.plate, .rail), .stage:has(#menu:not([hidden])) :is(.plate, .rail), .stage.intro :is(.plate, .rail) { opacity: 0; visibility: hidden; transition: none; }
-/* The results card sits under the status plate and control bar, out of the way, with no backdrop, so
-   the bot stays in full view. Its top is set from the bar's position when it appears. */
-#result { place-items: start; background: none; pointer-events: none; padding-left: 14px; }
+.hud { transition: opacity 0.4s; }
+.stage:has(#loading) .hud, .stage:has(#menu:not([hidden])) .hud, .stage.intro .hud { opacity: 0; visibility: hidden; transition: none; }
+/* Results card: the last item in the HUD column, under the control bar. */
 #result .card { pointer-events: auto; }
 /* Results card: the same width and compact style as the status plate above it. */
 #result .card { width: var(--hud-w); padding: 12px 14px; gap: 10px; }
@@ -178,3 +179,13 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 #result .stats { font-size: 0.78rem; gap: 3px 12px; }
 #result .actions .primary { flex: 1 1 100%; }
 #result .actions button { flex: 1 1 auto; }
+.plate, .rail, #result .card { background: rgba(18, 19, 23, 0.82); }
+/* Fold button in the plate's corner: collapses the HUD to just the title and stripe. */
+.fold {
+  position: absolute; top: 9px; right: 8px; width: 24px; height: 24px; padding: 0;
+  display: grid; place-items: center; pointer-events: auto; background: transparent; border-color: transparent; color: var(--muted);
+}
+.fold:hover { background: #2b2930; color: var(--ink); }
+.fold svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+.hud.folded .fold svg { transform: rotate(180deg); }
+.hud.folded .plate > :not(h1, .stripe, .fold), .hud.folded .rail, .hud.folded #result { display: none !important; }

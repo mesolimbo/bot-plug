@@ -1373,6 +1373,7 @@ function startTest(k, l, withIntro = false) {
   const t = LEVELS[k][l];
   const run = ++game.run;
   camIntro = withIntro ? { t: 0, run } : null;
+  applySavedFold(); // a results card may have opened a folded HUD
   game.test = k; game.level = l; game.state = "rising"; game.time = 0; game.started = null; game.peak = 0; game.lifted = 0; game.over = 0;
   game.autopilot = !manual;
   clearTimeout(resultTimer);
@@ -1434,8 +1435,11 @@ function finish(passed) {
     v.className = "verdict " + (passed ? "pass" : "fail");
     $("stats").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
     $("actions").innerHTML = acts.join("");
-    const below = document.querySelector(".rail").getBoundingClientRect().bottom - stage.getBoundingClientRect().top;
-    $("result").style.paddingTop = `${Math.round(below + 10)}px`;
+    // The results are worth seeing: open the HUD if it was folded away. This doesn't change the saved
+    // choice, so it folds again on the next level.
+    document.querySelector(".hud").classList.remove("folded");
+    $("hudToggle").setAttribute("aria-expanded", "true");
+    $("hudToggle").title = $("hudToggle").ariaLabel = "Hide panels";
     $("result").hidden = false;
   }, passed ? 600 : 1600);
 }
@@ -1477,6 +1481,21 @@ function toggleMenu() {
   showMenu();
 }
 $("menuBtn").onclick = showMenu;
+// Fold the HUD down to its title bar; remembered between visits.
+function setFolded(on) {
+  document.querySelector(".hud").classList.toggle("folded", on);
+  const t = $("hudToggle");
+  t.setAttribute("aria-expanded", String(!on));
+  t.title = t.ariaLabel = on ? "Show panels" : "Hide panels";
+  try { localStorage.setItem("abp-folded", on ? "1" : "0"); } catch { /* storage unavailable */ }
+}
+$("hudToggle").onclick = () => { setFolded(!document.querySelector(".hud").classList.contains("folded")); $("hudToggle").blur(); };
+function applySavedFold() {
+  let on = false;
+  try { on = localStorage.getItem("abp-folded") === "1"; } catch { /* storage unavailable */ }
+  setFolded(on);
+}
+applySavedFold();
 $("restart").onclick = () => { if (game.test !== null) startTest(game.test, game.level); };
 // Step back through this difficulty's levels, or forward up to the one you're trying to beat.
 function updateLevelButtons() {

@@ -12,10 +12,13 @@
 
 <div class="stage" id="stage">
   <canvas id="view"></canvas>
-  <!-- Status plate, then the control bar; the results card appears under them. -->
+  <!-- Status plate, control bar, and the results card when a level ends, on one frosted backing. -->
   <div class="hud">
     <div class="plate">
       <h1>Alan's <em>Bot Plugs</em></h1>
+      <button id="hudToggle" class="fold" aria-expanded="true" aria-label="Hide panels" title="Hide panels">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
       <span class="stripe"></span>
       <dl class="readout">
         <dt>Level</dt><dd><span class="tag"><i id="tagDot"></i><span id="testName">—</span></span></dd>
@@ -45,6 +48,13 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg>
       </span>
     </div>
+    <div id="result" hidden>
+      <div class="card small">
+        <p class="verdict" id="verdict">PASS</p>
+        <dl class="stats" id="stats"></dl>
+        <div class="actions" id="actions"></div>
+      </div>
+    </div>
   </div>
 
   <div class="overlay" id="menu" hidden>
@@ -57,13 +67,6 @@
     </div>
   </div>
 
-  <div class="overlay" id="result" hidden>
-    <div class="card small">
-      <p class="verdict" id="verdict">PASS</p>
-      <dl class="stats" id="stats"></dl>
-      <div class="actions" id="actions"></div>
-    </div>
-  </div>
 
   <div class="loading" id="loading">Powering up the test floor…</div>
 </div>
