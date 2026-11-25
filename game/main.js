@@ -35,12 +35,12 @@ const POST = 0.34;                   // square posts at wall ends and junctions,
 // and it runs out.
 const TESTS = [
   // One seed per level, picked so each maze gets its full count of islands and the right way gets
-  // longer level by level: about 24-33 m for Very Easy up to 37-49 m for Extra Hard.
-  { name: "Green", level: "Very Easy", hex: "#2fbf71", spare: 0.10, loops: 3, seeds: [17, 219, 151, 138, 286] },
-  { name: "Blue", level: "Easy", hex: "#3b82f6", spare: 0.08, loops: 4, seeds: [22, 1224, 1127, 1110, 1189] },
-  { name: "Yellow", level: "Medium", hex: "#f2c230", spare: 0.06, loops: 5, seeds: [8, 2202, 2211, 2151, 2108] },
-  { name: "Orange", level: "Hard", hex: "#f28b30", spare: 0.045, loops: 6, seeds: [14, 3112, 3194, 3100, 3115] },
-  { name: "Red", level: "Extra Hard", hex: "#e5484d", spare: 0.03, loops: 7, seeds: [5, 4128, 4155, 4287, 4295] },
+  // longer level by level: about 24-46 m for Very Easy up to 37-61 m for Extra Hard.
+  { name: "Green", level: "Very Easy", hex: "#2fbf71", spare: 0.10, loops: 3, seeds: [17, 219, 151, 138, 286, 5037, 5165, 5001, 5157, 5055] },
+  { name: "Blue", level: "Easy", hex: "#3b82f6", spare: 0.08, loops: 4, seeds: [22, 1224, 1127, 1110, 1189, 7118, 7025, 7198, 7163, 7255] },
+  { name: "Yellow", level: "Medium", hex: "#f2c230", spare: 0.06, loops: 5, seeds: [8, 2202, 2211, 2151, 2108, 9171, 9295, 9119, 9002, 9299] },
+  { name: "Orange", level: "Hard", hex: "#f28b30", spare: 0.045, loops: 6, seeds: [14, 3112, 3194, 3100, 3115, 11100, 11383, 11318, 11227, 11234] },
+  { name: "Red", level: "Extra Hard", hex: "#e5484d", spare: 0.03, loops: 7, seeds: [5, 4128, 4155, 4287, 4295, 13280, 13879, 14495, 14242, 14025] },
 ];
 
 function rng(seed) {
@@ -111,7 +111,7 @@ function makeMaze(test) {
   for (let i = 0; i <= COLS; i++) for (let r = 0; r < ROWS; r++) if (vWall[i][r]) test.v.push([i, r, r]);
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) if (hWall[j][c]) test.h.push([j, c, c]);
 }
-const LEVEL_COUNT = 5;
+const LEVEL_COUNT = 10;
 const LEVELS = TESTS.map((d) => d.seeds.map((seed) => {
   const m = { ...d, seed };
   makeMaze(m);
@@ -407,7 +407,8 @@ const LIGHT_LAYOUTS = [
   [[-0.45, 0.3], [0.45, 0.3]],                       // a pair at the ends
   [[-0.38, 0.16], [-0.16, 0.16], [0.06, 0.16]],      // a row of three short ones
 ];
-const capMat = toon({ map: canvasTex(64, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 24)) });
+// Post caps: drawn at 512 px so the stripes stay crisp when the camera comes close.
+const capMat = toon({ map: canvasTex(512, 512, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 192)) });
 const walls = []; // { minX, maxX, minZ, maxZ, mesh, rise, target, h }
 // Panels stop at the posts and posts stand alone at each grid point, so no two wall
 // pieces overlap or share a face. Panels run 2 cm into their posts.
@@ -1471,7 +1472,7 @@ function startTest(k, l, withIntro = false) {
   $("menu").hidden = true; $("result").hidden = true;
   document.documentElement.style.setProperty("--accent", t.hex);
   cableMat.color.set(t.hex);
-  $("testName").textContent = `${t.level} · ${l + 1}/${LEVEL_COUNT}`;
+  $("testName").textContent = `${t.level} ${l + 1}/${LEVEL_COUNT}`;
   updateLevelButtons();
   $("pullLim").textContent = `${Math.round(t.spare * 1000) / 10}%`;
   if (unplugged) replug();
@@ -1498,22 +1499,14 @@ function finish(passed) {
   if (game.state !== "playing") return;
   game.state = passed ? "passed" : "failed";
   game.cheer = game.time + 0.4; // he settles for a moment, then stomps for joy
-  const k = game.test, l = game.level, t = LEVELS[k][l], key = `${k}.${l}`;
+  const k = game.test, l = game.level, key = `${k}.${l}`;
   const time = game.started === null ? 0 : game.time - game.started;
-  const progress = THREE.MathUtils.clamp((bot.pos.x - START.x) / (GOAL_X - START.x), 0, 1);
-  let isBest = false;
   if (passed && !game.autopilot && (!best[key] || time < best[key])) {
-    best[key] = time; isBest = true;
+    best[key] = time;
     try { localStorage.setItem("abp-best", JSON.stringify(best)); } catch { /* storage unavailable */ }
   }
   // Settle the card's contents now; it only appears after a beat, and is dropped if a new test starts.
-  const rows = [
-    ["Level", `${t.level} ${l + 1}/${LEVEL_COUNT}`],
-    ["Cable", `${t.len.toFixed(1)} m · ${Math.round(t.spare * 1000) / 10}%`],
-    passed ? ["Time", fmt(time) + (isBest ? " · best" : "")] : ["Route covered", `${Math.round(progress * 100)}%`],
-    ["Least left", `${Math.max(0, t.len * (1 - game.peak)).toFixed(1)} m`],
-  ];
-  if (game.autopilot) rows.push(["Driver", "Autopilot"]);
+  // The HUD above it already shows the level, cable and time, so the card is just the verdict and buttons.
   const acts = [];
   updateLevelButtons(); // a pass can unlock the next level
   const next = nextLevel(k, l);
@@ -1525,7 +1518,6 @@ function finish(passed) {
     const v = $("verdict");
     v.textContent = passed ? "PASS" : "UNPLUGGED";
     v.className = "verdict " + (passed ? "pass" : "fail");
-    $("stats").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
     $("actions").innerHTML = acts.join("");
     // The results are worth seeing: open the HUD if it was folded away. This doesn't change the saved
     // choice, so it folds again on the next level.
@@ -1558,7 +1550,7 @@ function renderMenu() {
       <path d="M4 26 C 20 4, 34 4, 40 17 S 60 30, 70 17 S 92 4, 100 17 S 112 28, 116 20" fill="none" stroke="${t.hex}" stroke-width="5" stroke-linecap="round"/></svg>`;
     const pips = Array.from({ length: LEVEL_COUNT }, (_, i) => `<span class="${i < times.length ? "on" : ""}"></span>`).join("");
     return `<button class="test" data-k="${k}" style="--c:${t.hex}">
-      ${coil}<b>${t.level}</b><small>${LEVEL_COUNT} levels<br>${Math.round(t.spare * 1000) / 10}% spare</small>
+      ${coil}<b>${t.level}</b><small>${LEVEL_COUNT} levels<br>${Math.round(t.spare * 1000) / 10}% slack</small>
       <span class="pips" aria-label="${times.length} of ${LEVEL_COUNT} levels passed">${pips}</span>
       <span class="best ${times.length === LEVEL_COUNT ? "pass" : ""}">Time · ${times.length ? fmt(total) : "—"}</span></button>`;
   }).join("");
@@ -1567,7 +1559,17 @@ $("tests").addEventListener("click", (e) => {
   const k = e.target.closest(".test")?.dataset.k;
   if (k !== undefined) startTest(Number(k), firstOpen(Number(k)), true);
 });
-function showMenu() { renderMenu(); $("result").hidden = true; $("menu").hidden = false; }
+function showMenu() { renderMenu(); $("result").hidden = true; $("menu").hidden = false; fitMenu(); }
+// Shrink the whole menu to fit the space under the sign rather than letting it scroll.
+function fitMenu() {
+  const menu = $("menu"), frost = menu.querySelector(".frost");
+  if (menu.hidden) return;
+  frost.style.zoom = 1;
+  const room = menu.clientHeight * (1 - 0.31) - 16 - 32, wide = menu.clientWidth - 32;
+  const scale = Math.min(1, room / frost.offsetHeight, wide / Math.max(frost.offsetWidth, frost.scrollWidth));
+  frost.style.zoom = Math.max(0.4, scale).toFixed(3);
+}
+addEventListener("resize", fitMenu);
 function toggleMenu() {
   if (!$("menu").hidden && game.test !== null) { $("menu").hidden = true; return; }
   showMenu();
