@@ -2,6 +2,11 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const $ = (id) => document.getElementById(id);
+// Signs and floor stencils are drawn into textures once, so wait (up to 3 s) for their font first.
+await Promise.race([
+  Promise.all(["600", "700"].map((w) => document.fonts.load(`${w} 40px "Chakra Petch"`))),
+  new Promise((r) => setTimeout(r, 3000)),
+]);
 const stage = $("stage");
 
 // --- Floor plan (metres). The bot is 1 m tall. ---------------------------------------------
@@ -23,17 +28,19 @@ const SLUMP = THREE.MathUtils.degToRad(20);
 const BOT_SOCKET = new THREE.Vector3(-0.245, 0.030, 0); // bot model space: centre of the orange ring, tip just inside it
 const POST = 0.34;                   // square posts at wall ends and junctions, wider than the panels
 
-// Five test cables. Each test is a real maze built from a fixed seed: a full maze, then extra openings
-// that each add a second way through, 3 to 8 cells longer than the right one. That leaves islands on
-// the route you can pass either side of. The cable is just long enough for the right way plus its
-// colour's spare; take a long way round and it runs out.
+// Five difficulties, each with its own cable colour and spare, and five levels. Each level is a real
+// maze built from a fixed seed: a full maze, then extra openings that each add a second way through,
+// 3 to 8 cells longer than the right one. That leaves islands on the route you can pass either side
+// of. The cable is just long enough for the right way plus its colour's spare; take a long way round
+// and it runs out.
 const TESTS = [
-  // Seeds picked for routes of about 27, 32, 34, 38 and 42 m; every wrong way is 5 m or more longer.
-  { name: "Green", hex: "#2fbf71", spare: 0.10, seed: 17, loops: 3 },
-  { name: "Blue", hex: "#3b82f6", spare: 0.08, seed: 22, loops: 4 },
-  { name: "Yellow", hex: "#f2c230", spare: 0.06, seed: 8, loops: 5 },
-  { name: "Orange", hex: "#f28b30", spare: 0.045, seed: 14, loops: 6 },
-  { name: "Red", hex: "#e5484d", spare: 0.03, seed: 5, loops: 7 },
+  // One seed per level, picked so each maze gets its full count of islands and the right way gets
+  // longer level by level: about 24-33 m for Very Easy up to 37-49 m for Extra Hard.
+  { name: "Green", level: "Very Easy", hex: "#2fbf71", spare: 0.10, loops: 3, seeds: [17, 219, 151, 138, 286] },
+  { name: "Blue", level: "Easy", hex: "#3b82f6", spare: 0.08, loops: 4, seeds: [22, 1224, 1127, 1110, 1189] },
+  { name: "Yellow", level: "Medium", hex: "#f2c230", spare: 0.06, loops: 5, seeds: [8, 2202, 2211, 2151, 2108] },
+  { name: "Orange", level: "Hard", hex: "#f28b30", spare: 0.045, loops: 6, seeds: [14, 3112, 3194, 3100, 3115] },
+  { name: "Red", level: "Extra Hard", hex: "#e5484d", spare: 0.03, loops: 7, seeds: [5, 4128, 4155, 4287, 4295] },
 ];
 
 function rng(seed) {
@@ -104,7 +111,12 @@ function makeMaze(test) {
   for (let i = 0; i <= COLS; i++) for (let r = 0; r < ROWS; r++) if (vWall[i][r]) test.v.push([i, r, r]);
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) if (hWall[j][c]) test.h.push([j, c, c]);
 }
-TESTS.forEach(makeMaze);
+const LEVEL_COUNT = 5;
+const LEVELS = TESTS.map((d) => d.seeds.map((seed) => {
+  const m = { ...d, seed };
+  makeMaze(m);
+  return m;
+}));
 
 // --- Renderer, scene, camera ------------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ canvas: $("view"), antialias: true });
@@ -274,6 +286,18 @@ for (let x = -9; x <= 9; x += 6) {
     lamp.position.set(x, ROOM.h - 2.4, z); scene.add(lamp);
     const hood = inked(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 0.46), steel));
     hood.position.set(x, ROOM.h - 2.3, z); scene.add(hood);
+    // Hanger rods from each end of the hood up to a clamp on the truss above.
+    const top = new THREE.Vector3(x, ROOM.h - 1.13, z);
+    for (const side of [-1, 1]) {
+      const foot = new THREE.Vector3(x + side * 0.6, ROOM.h - 2.23, z);
+      const span = top.clone().sub(foot);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, span.length(), 8), steelLight);
+      rod.position.copy(foot).addScaledVector(span, 0.5);
+      rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), span.normalize());
+      scene.add(rod);
+    }
+    const clamp = inked(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.3), steel));
+    clamp.position.copy(top); scene.add(clamp);
   }
 }
 const glass = new THREE.MeshBasicMaterial({ color: 0x8fa7c4 });
@@ -281,19 +305,43 @@ for (const x of [-7.5, 7.5]) {
   const win = inked(new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.4, 0.05), glass));
   win.position.set(x, 7.6, -ROOM.z + 0.03); scene.add(win);
 }
-const sign = (text, sub, w, h, pos, rotY) => {
+// text is a string, or [words, colour] pieces drawn side by side. A lit sign shows its own colours at
+// full strength instead of being shaded by the room's light.
+const sign = (text, sub, w, h, pos, rotY, lit = false) => {
+  const parts = typeof text === "string" ? [[text, "#ece6da"]] : text;
   const tex = canvasTex(1024, Math.round(1024 * h / w), (g, cw, ch) => {
     g.fillStyle = "#1b1b1d"; g.fillRect(0, 0, cw, ch);
-    g.fillStyle = "#f2b705"; g.fillRect(0, ch - 14, cw, 14);
-    g.fillStyle = "#ece6da"; g.textAlign = "center"; g.textBaseline = "middle";
+    // Hazard-striped strip along the bottom edge.
+    const strip = 22;
+    g.save();
+    g.translate(0, ch - strip);
+    g.beginPath(); g.rect(0, 0, cw, strip); g.clip();
+    stripes(g, cw, strip, "#f2b705", "#1b1b1d", 40);
+    g.restore();
+    g.textAlign = "left"; g.textBaseline = "middle";
     g.font = `700 ${ch * (sub ? 0.42 : 0.6)}px "Chakra Petch", sans-serif`;
-    g.fillText(text, cw / 2, sub ? ch * 0.38 : ch / 2);
-    if (sub) { g.fillStyle = "#f2b705"; g.font = `600 ${ch * 0.17}px "Chakra Petch", sans-serif`; g.fillText(sub, cw / 2, ch * 0.75); }
+    let x = (cw - parts.reduce((s, [t]) => s + g.measureText(t).width, 0)) / 2;
+    for (const [t, colour] of parts) {
+      g.fillStyle = colour;
+      g.fillText(t, x, sub ? ch * 0.38 : ch / 2);
+      x += g.measureText(t).width;
+    }
+    if (sub) {
+      g.textAlign = "center";
+      g.fillStyle = "#9a978f"; g.font = `600 ${ch * 0.17}px "Chakra Petch", sans-serif`; g.fillText(sub, cw / 2, ch * 0.72);
+    }
   });
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), toon({ map: tex }));
+  const mat = lit ? new THREE.MeshBasicMaterial({ map: tex }) : toon({ map: tex });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   m.position.copy(pos); m.rotation.y = rotY; scene.add(m);
 };
-sign("ALAN'S BOT PLUGS", "QUALITY CONTROL · CABLE TEST FLOOR", 9, 2.2, new THREE.Vector3(0, 5.6, -ROOM.z + 0.06), 0);
+// The main sign hangs on the front of the wall's steel ribs, on a dark backing board.
+const SIGN_AT = new THREE.Vector3(0, 5.6, -ROOM.z + 0.26);
+{
+  const board = inked(new THREE.Mesh(new THREE.BoxGeometry(9.3, 2.5, 0.08), steel));
+  board.position.set(SIGN_AT.x, SIGN_AT.y, SIGN_AT.z - 0.05); scene.add(board);
+}
+sign([["ALAN'S ", "#ece6da"], ["BOT PLUGS", "#f2b705"]], "QUALITY CONTROL CENTER - TEST FLOOR", 9, 2.2, SIGN_AT, 0, true);
 sign("GOAL", null, 3, 0.9, new THREE.Vector3(ROOM.x - 0.05, 5.4, 0), -Math.PI / 2);
 sign("TEST SOCKET", null, 3, 0.7, new THREE.Vector3(-ROOM.x + 0.05, 3.2, 0), Math.PI / 2);
 // Roller door behind the goal, for units that pass.
@@ -346,9 +394,15 @@ function wallBoxes(test) {
   }
   return out;
 }
+// One wall per slot position: pieces that stand in the same place in both layouts stay up (or rise
+// back if they were sinking); only the others sink or rise.
+const wallKey = (b) => `${b.cx.toFixed(3)},${b.cz.toFixed(3)},${b.sx.toFixed(3)},${b.sz.toFixed(3)}`;
 function buildWalls(test) {
-  for (const w of walls) w.target = -0.02; // sink the old ones
+  const have = new Map(walls.map((w) => [wallKey(w), w]));
+  const keep = new Set();
   for (const b of wallBoxes(test)) {
+    const old = have.get(wallKey(b));
+    if (old) { old.target = 1; keep.add(old); continue; }
     const mesh = inked(new THREE.Mesh(new THREE.BoxGeometry(b.sx, b.h, b.sz), b.post ? postMat : panelMat));
     mesh.castShadow = true; mesh.receiveShadow = true;
     mesh.position.set(b.cx, -b.h / 2, b.cz);
@@ -358,8 +412,11 @@ function buildWalls(test) {
       mesh.add(cap);
     }
     scene.add(mesh);
-    walls.push({ ...b, mesh, rise: 0, target: 1 });
+    const w = { ...b, mesh, rise: 0, target: 1 };
+    walls.push(w);
+    keep.add(w);
   }
+  for (const w of walls) if (!keep.has(w)) w.target = -0.02; // sink the rest
 }
 function updateWalls(dt) {
   for (let k = walls.length - 1; k >= 0; k--) {
@@ -677,6 +734,23 @@ function simRope(dt) {
 // The rope in 3D. It drops from the socket in one smooth curve, runs along the floor, and rises to the
 // plug the same way; near the bot it stays at plug height while it's wound round him. When the ends are
 // too close for both drops to reach the floor, the cable hangs between them in one sag.
+// The cable hanging from the plug is drawn as one curve to where it lands, HANG out along the floor
+// rope, so slack bunched under the plug never shows as a fold. Returns the landing index, or -1 when
+// the straight way there would pass through the bot or a wall.
+const HANG = 0.75;
+function hangLanding() {
+  const fx = botEnd.x + botDir.x * 0.06, fz = botEnd.z + botDir.z * 0.06;
+  let j = -1;
+  for (let i = rp.length - 1; i >= 3; i--) {
+    if (Math.hypot(rp[i].x - fx, rp[i].y - fz) >= HANG) { j = i; break; }
+  }
+  if (j < 3) return -1;
+  const ax = fx - bot.pos.x, az = fz - bot.pos.z, ex = rp[j].x - fx, ez = rp[j].y - fz;
+  const t = THREE.MathUtils.clamp(-(ax * ex + az * ez) / Math.max(1e-9, ex * ex + ez * ez), 0, 1);
+  if (Math.hypot(ax + ex * t, az + ez * t) < BODY_R - 0.02) return -1;
+  const a = new THREE.Vector3(fx, 0.3, fz), b = new THREE.Vector3(rp[j].x, 0.3, rp[j].y);
+  return wallList.some((w) => segmentHitsBox(a, b, w)) ? -1 : j;
+}
 function cablePoints() {
   const out = [wallEnd.clone()], m = rp.length;
   const arc = new Float32Array(m), fromHead = new Float32Array(m);
@@ -685,11 +759,17 @@ function cablePoints() {
   const smooth = (t) => 1 - t * t * (3 - 2 * t);
   const head = (i) => wallEnd.y * smooth(Math.min(1, fromHead[i] / SOCKET_DROP));
   const h = new Float32Array(m);
+  // sc: how much cable near the plug lies against his body (wound round him).
+  let landing = -1, sc = 0;
   if (!ropeFree) {
-    let sc = 0;
     for (let i = m - 1; i >= 0 && arc[i] - sc <= 0.35; i--) {
       if (Math.hypot(rp[i].x - bot.pos.x, rp[i].y - bot.pos.z) < 0.42) sc = arc[i];
     }
+    if (sc === 0) landing = hangLanding();
+  }
+  if (landing >= 0) {
+    // The floor rope stays on the floor; the hanging curve is added below.
+  } else if (!ropeFree) {
     const H0 = botEnd.y;
     const hw = (s) => Math.max(0.25, H0 - (0.05 * s) / (2 * Math.PI * BODY_R));
     const hc = hw(sc), drop = 0.3 + hc * 1.6;
@@ -715,6 +795,24 @@ function cablePoints() {
     const next = sm.map((p) => p.clone());
     for (let i = 2; i < m - 2; i++) next[i].lerp(sm[i - 1].clone().add(sm[i + 1]).multiplyScalar(0.5), 0.5);
     sm = next;
+  }
+  if (landing >= 0) {
+    // From the landing point, carrying on the floor rope's direction, up to the plug along its axis.
+    const P0 = sm[landing], back = Math.max(0, landing - 3);
+    const dir = new THREE.Vector3(rp[landing].x - rp[back].x, 0, rp[landing].y - rp[back].y);
+    if (dir.lengthSq() < 1e-8) dir.set(botEnd.x - P0.x, 0, botEnd.z - P0.z);
+    dir.normalize();
+    const span = Math.hypot(botEnd.x - P0.x, botEnd.z - P0.z);
+    const P1 = P0.clone().addScaledVector(dir, span * 0.4);
+    const P2 = botEnd.clone().addScaledVector(botDir, 0.42);
+    out.push(...sm.slice(0, landing + 1));
+    for (let k = 1; k <= 16; k++) {
+      const t = k / 16, u = 1 - t;
+      out.push(new THREE.Vector3()
+        .addScaledVector(P0, u * u * u).addScaledVector(P1, 3 * u * u * t)
+        .addScaledVector(P2, 3 * u * t * t).addScaledVector(botEnd, t * t * t));
+    }
+    return out;
   }
   out.push(...sm);
   if (!ropeFree) out.push(botEnd.clone());
@@ -896,8 +994,9 @@ const KEYMAP = { KeyW: "fwd", ArrowUp: "fwd", KeyS: "back", ArrowDown: "back", K
 };
 addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, textarea")) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if (e.code === "Escape") { e.preventDefault(); toggleMenu(); return; }
-  if (e.code === "KeyR" && game.test !== null && $("menu").hidden) { e.preventDefault(); startTest(game.test); return; }
+  if (e.code === "KeyR" && game.test !== null && $("menu").hidden) { e.preventDefault(); startTest(game.test, game.level); return; }
   const k = KEYMAP[e.code];
   if (!k || !$("menu").hidden) return;
   e.preventDefault();
@@ -1214,20 +1313,30 @@ function layCable() {
 }
 
 // --- Game state -------------------------------------------------------------------------------
-const game = { test: null, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false };
+const game = { test: null, level: 0, run: 0, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false };
+// Best times by "difficulty.level". Times saved before levels existed count as level 1.
 let best = {};
 try { best = JSON.parse(localStorage.getItem("abp-best") || "{}"); } catch { best = {}; }
+for (const key of Object.keys(best)) {
+  if (/^\d+$/.test(key)) { best[`${key}.0`] ??= best[key]; delete best[key]; }
+}
+const bestOf = (k, l) => best[`${k}.${l}`];
+// A difficulty starts at its first level not yet passed.
+const firstOpen = (k) => Math.max(0, LEVELS[k].findIndex((_, l) => !bestOf(k, l)));
 const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
-function startTest(k) {
-  const t = TESTS[k];
-  game.test = k; game.state = "rising"; game.time = 0; game.started = null; game.peak = 0; game.lifted = 0; game.over = 0;
+// withIntro: the camera opens on the sign, then swings round and closes in on the bot before he walks.
+function startTest(k, l, withIntro = false) {
+  const t = LEVELS[k][l];
+  const run = ++game.run;
+  camIntro = withIntro ? { t: 0, run } : null;
+  game.test = k; game.level = l; game.state = "rising"; game.time = 0; game.started = null; game.peak = 0; game.lifted = 0; game.over = 0;
   game.autopilot = !manual;
   clearTimeout(resultTimer);
   $("menu").hidden = true; $("result").hidden = true;
   document.documentElement.style.setProperty("--accent", t.hex);
   cableMat.color.set(t.hex);
-  $("testName").textContent = `${k + 1} · ${t.name}`;
+  $("testName").textContent = `${t.level} · ${l + 1}/${LEVEL_COUNT}`;
   $("pullLim").textContent = `${Math.round(t.spare * 1000) / 10}%`;
   if (unplugged) replug();
   power = 1;
@@ -1242,7 +1351,7 @@ function startTest(k) {
   layCable();
   needed = 0;
   route = []; routeIdx = 0;
-  setTimeout(() => { if (game.test === k && game.state === "rising") beginPlay(); }, 1300);
+  if (!withIntro) setTimeout(() => { if (game.run === run && game.state === "rising") beginPlay(); }, 1300);
 }
 function beginPlay() {
   game.state = "playing";
@@ -1252,25 +1361,25 @@ function beginPlay() {
 function finish(passed) {
   if (game.state !== "playing") return;
   game.state = passed ? "passed" : "failed";
-  const t = TESTS[game.test];
+  const k = game.test, l = game.level, t = LEVELS[k][l], key = `${k}.${l}`;
   const time = game.started === null ? 0 : game.time - game.started;
   const progress = THREE.MathUtils.clamp((bot.pos.x - START.x) / (GOAL_X - START.x), 0, 1);
   let isBest = false;
-  if (passed && !game.autopilot && (!best[game.test] || time < best[game.test])) {
-    best[game.test] = time; isBest = true;
+  if (passed && !game.autopilot && (!best[key] || time < best[key])) {
+    best[key] = time; isBest = true;
     try { localStorage.setItem("abp-best", JSON.stringify(best)); } catch { /* storage unavailable */ }
   }
   // Settle the card's contents now; it only appears after a beat, and is dropped if a new test starts.
-  const k = game.test;
   const rows = [
-    ["Test", `${k + 1} · ${t.name} cable`],
+    ["Level", `${t.level} ${l + 1}/${LEVEL_COUNT} · ${t.name.toLowerCase()} cable`],
     ["Cable", `${t.len.toFixed(1)} m · ${Math.round(t.spare * 1000) / 10}% spare`],
     passed ? ["Time", fmt(time) + (isBest ? " · best" : "")] : ["Route covered", `${Math.round(progress * 100)}%`],
     ["Least cable left", `${Math.max(0, t.len * (1 - game.peak)).toFixed(1)} m`],
   ];
   if (game.autopilot) rows.push(["Driver", "Autopilot (no best time)"]);
   const acts = [];
-  if (passed && k < TESTS.length - 1) acts.push(`<button class="primary" data-act="next">Next test · ${TESTS[k + 1].name}</button>`);
+  const next = nextLevel(k, l);
+  if (passed && next) acts.push(`<button class="primary" data-act="next">Next level · ${TESTS[next[0]].level} ${next[1] + 1}/${LEVEL_COUNT}</button>`);
   acts.push(`<button ${passed ? "" : 'class="primary"'} data-act="retry">Retry</button>`, `<button data-act="menu">All tests</button>`);
   clearTimeout(resultTimer);
   resultTimer = setTimeout(() => {
@@ -1283,29 +1392,36 @@ function finish(passed) {
   }, passed ? 600 : 1600);
 }
 let resultTimer = null;
+// The level after this one: the next in this difficulty, then the first of the next difficulty.
+function nextLevel(k, l) {
+  if (l + 1 < LEVEL_COUNT) return [k, l + 1];
+  return k + 1 < TESTS.length ? [k + 1, 0] : null;
+}
 $("actions").addEventListener("click", (e) => {
   const act = e.target.closest("button")?.dataset.act;
-  if (act === "next") startTest(game.test + 1);
-  if (act === "retry") startTest(game.test);
+  if (act === "next") { const n = nextLevel(game.test, game.level); if (n) startTest(n[0], n[1], true); }
+  if (act === "retry") startTest(game.test, game.level);
   if (act === "menu") showMenu();
 });
 
 function renderMenu() {
   $("tests").innerHTML = TESTS.map((t, k) => {
-    const b = best[k];
+    // Levels passed in this difficulty, and the total of their best times.
+    const times = LEVELS[k].map((_, l) => bestOf(k, l)).filter((v) => v);
+    const total = times.reduce((a, v) => a + v, 0);
     const coil = `<svg class="coil" viewBox="0 0 120 34" aria-hidden="true">
       <path d="M4 26 C 20 4, 34 4, 40 17 S 60 30, 70 17 S 92 4, 100 17 S 112 28, 116 20" fill="none" stroke="#101114" stroke-width="9" stroke-linecap="round"/>
       <path d="M4 26 C 20 4, 34 4, 40 17 S 60 30, 70 17 S 92 4, 100 17 S 112 28, 116 20" fill="none" stroke="${t.hex}" stroke-width="5" stroke-linecap="round"/></svg>`;
-    const pips = Array.from({ length: 5 }, (_, i) => `<span class="${i <= k ? "on" : ""}"></span>`).join("");
+    const pips = Array.from({ length: LEVEL_COUNT }, (_, i) => `<span class="${i < times.length ? "on" : ""}"></span>`).join("");
     return `<button class="test" data-k="${k}" style="--c:${t.hex}">
-      ${coil}<b>Test ${k + 1} · ${t.name}</b><small>${t.len.toFixed(1)} m cable<br>${Math.round(t.spare * 1000) / 10}% spare</small>
-      <span class="pips" aria-label="Difficulty ${k + 1} of 5">${pips}</span>
-      <span class="best ${b ? "pass" : ""}">${b ? "Passed · " + fmt(b) : "Not passed yet"}</span></button>`;
+      ${coil}<b>${t.level}</b><small>${LEVEL_COUNT} levels<br>${Math.round(t.spare * 1000) / 10}% spare</small>
+      <span class="pips" aria-label="${times.length} of ${LEVEL_COUNT} levels passed">${pips}</span>
+      <span class="best ${times.length === LEVEL_COUNT ? "pass" : ""}">Time · ${times.length ? fmt(total) : "—"}</span></button>`;
   }).join("");
 }
 $("tests").addEventListener("click", (e) => {
   const k = e.target.closest(".test")?.dataset.k;
-  if (k !== undefined) startTest(Number(k));
+  if (k !== undefined) startTest(Number(k), firstOpen(Number(k)), true);
 });
 function showMenu() { renderMenu(); $("result").hidden = true; $("menu").hidden = false; }
 function toggleMenu() {
@@ -1313,7 +1429,7 @@ function toggleMenu() {
   showMenu();
 }
 $("menuBtn").onclick = showMenu;
-$("restart").onclick = () => { if (game.test !== null) startTest(game.test); };
+$("restart").onclick = () => { if (game.test !== null) startTest(game.test, game.level); };
 
 // --- Camera and controls -------------------------------------------------------------------------
 // Follow: over the bot's shoulder, just above the wall tops, turning as he turns.
@@ -1339,6 +1455,16 @@ function camGoal() {
   }
   camGoalPos.x = THREE.MathUtils.clamp(camGoalPos.x, -ROOM.x + 0.3, ROOM.x - 0.3);
   camGoalPos.z = THREE.MathUtils.clamp(camGoalPos.z, -ROOM.z + 0.3, ROOM.z - 0.3);
+  if (follow) {
+    // Backed up against the room's wall, rise instead, so he doesn't fill the view.
+    // Aim back toward him by the same amount, so he stays in the middle of the view.
+    const d = Math.hypot(camGoalPos.x - bot.pos.x, camGoalPos.z - bot.pos.z);
+    const rise = Math.max(0, FOLLOW_BACK - d) * 1.1;
+    camGoalPos.y += rise;
+    const pull = Math.min(FOLLOW_AHEAD + 0.3, rise * 0.9);
+    camGoalLook.x -= Math.cos(camYaw) * pull;
+    camGoalLook.z += Math.sin(camYaw) * pull;
+  }
 }
 // In Follow, walls between the camera and the bot fade so they never hide him.
 const ghosts = new Map();
@@ -1374,17 +1500,46 @@ function segmentHitsBox(a, b, w) {
   return true;
 }
 const _sight = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+// Never during the opening shot: the walls stay solid until the bot starts.
 function fadeBlockers() {
   // Only sight lines to the bot himself (feet, middle, head): walls ahead of him never fade.
   _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
   _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
   _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
-  for (const w of walls) setGhost(w, follow && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
+  for (const w of walls) setGhost(w, follow && !camIntro && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
+}
+// Opening shot: hold on the sign, then swing round in an arc and close in on the bot.
+const INTRO_HOLD = 1.0, INTRO_MOVE = 2.8;
+// The opening pose frames the sign in the top of the view, with the test floor below it. The first menu
+// sits over this same shot, so starting a test carries straight on from it.
+const INTRO_FROM = new THREE.Vector3(0, 4.4, 6.4), INTRO_LOOK = new THREE.Vector3(0, 2.3, -ROOM.z);
+let camIntro = null; // { t, k, hold } while the opening shot plays; hold keeps it on the sign
+const _bz = new THREE.Vector3();
+function introCamera(dt) {
+  camIntro.t = camIntro.hold ? 0 : camIntro.t + dt;
+  const u = THREE.MathUtils.clamp((camIntro.t - INTRO_HOLD) / INTRO_MOVE, 0, 1);
+  const e = u * u * u * (u * (u * 6 - 15) + 10);
+  const mid = _bz.set((INTRO_FROM.x + camGoalPos.x) / 2 - 1.5, 5.6, 4.5);
+  const a = 1 - e;
+  camera.position.set(0, 0, 0).addScaledVector(INTRO_FROM, a * a).addScaledVector(mid, 2 * a * e).addScaledVector(camGoalPos, e * e);
+  const lookE = THREE.MathUtils.smoothstep(Math.min(1, u * 1.3), 0, 1);
+  camLook.copy(INTRO_LOOK).lerp(camGoalLook, lookE);
+  camera.lookAt(camLook);
+  if (camIntro.t >= INTRO_HOLD + INTRO_MOVE) {
+    const run = camIntro.run;
+    camIntro = null;
+    if (game.run === run && game.state === "rising") beginPlay();
+  }
 }
 function updateCamera(dt, snap) {
   camYaw += angleDiff(bot.heading, camYaw) * (snap ? 1 : 1 - Math.exp(-dt * 3));
   overheadH = THREE.MathUtils.clamp(overheadH, OVERHEAD_MIN, overheadMax());
   camGoal();
+  if (camIntro) {
+    introCamera(dt);
+    fadeBlockers();
+    return;
+  }
   const k = snap ? 1 : 1 - Math.exp(-dt * 5);
   camera.position.lerp(camGoalPos, k);
   camLook.lerp(camGoalLook, k);
@@ -1403,19 +1558,16 @@ renderer.domElement.addEventListener("wheel", (e) => {
   e.preventDefault();
   if (!follow) overheadH = THREE.MathUtils.clamp(overheadH * Math.exp(e.deltaY * 0.0012), OVERHEAD_MIN, overheadMax());
 }, { passive: false });
+// Autopilot is for testing only: open the page with ?autopilot to have the bot drive itself.
 function setDrive(isManual) {
   manual = isManual;
   keys.clear();
-  $("driveManual").setAttribute("aria-pressed", String(manual));
-  $("driveAuto").setAttribute("aria-pressed", String(!manual));
   if (!manual) {
     game.autopilot = true;
     if (game.state === "playing") { const r = planRoute(bot.pos); route = r.points; routeIdx = 1; }
   }
-  $("driveManual").blur(); $("driveAuto").blur();
 }
-$("driveManual").onclick = () => setDrive(true);
-$("driveAuto").onclick = () => setDrive(false);
+if (new URLSearchParams(location.search).has("autopilot")) setDrive(false);
 let paused = false;
 $("pause").onclick = () => {
   paused = !paused;
@@ -1431,9 +1583,9 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 resize();
 
-// Each cable's length: the correct route through its maze, pulled tight the same way the game
+// Each level's cable length: the correct route through its maze, pulled tight the same way the game
 // measures your walk, plus the colour's spare.
-for (const t of TESTS) {
+for (const t of LEVELS.flat()) {
   const boxes = wallBoxes(t);
   const r = planRoute(START, boxes);
   const line = new Taut(socketFoot(), new THREE.Vector2(START.x, START.z), wallCorners(boxes));
@@ -1442,13 +1594,14 @@ for (const t of TESTS) {
   t.len = Math.ceil(t.route * (1 + t.spare) * 2) / 2;
 }
 
-// Ready: show the green test laid out behind the menu.
-rope = makeRope(TESTS[0].len);
+// Ready: show the first level laid out behind the menu.
+rope = makeRope(LEVELS[0][0].len);
 buildCableMeshes();
-buildWalls(TESTS[0]);
+buildWalls(LEVELS[0][0]);
 for (const w of walls) { w.rise = 1; w.mesh.position.y = w.h / 2; }
 layCable();
 $("loading").remove();
+camIntro = { t: 0, run: null, hold: true }; // the first menu sits over the sign
 updateCamera(0, true);
 showMenu();
 

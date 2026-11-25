@@ -99,16 +99,21 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
   padding: 22px 24px; display: grid; gap: 16px;
 }
 .card.small { width: min(420px, 100%); }
-.brand { display: grid; gap: 6px; }
-.brand h2 {
-  margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: 0.02em;
-  font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1; text-wrap: balance;
+/* The test menu sits low, over a fade, so the warehouse sign stays in view above it. */
+#menu {
+  display: flex; flex-direction: column; align-items: center;
+  background: linear-gradient(to top, rgba(10, 11, 14, 0.8), rgba(10, 11, 14, 0) 65%);
 }
-.brand h2 em { font-style: normal; color: var(--hazard); }
-.brand p { margin: 0; color: var(--muted); max-width: 60ch; line-height: 1.5; font-size: 0.92rem; }
+/* The card starts just below the sign, which always fills the top 30% or so of the view, and stops
+   above the control bar. */
+#menu::before { content: ""; flex: 0 1 31%; }
+#menu::after { content: ""; flex: 0 0 64px; }
+#menu .card { flex: 0 1 auto; }
+.brand { display: grid; gap: 6px; }
+.brand p { margin: 0 auto; color: var(--muted); max-width: 60ch; line-height: 1.5; font-size: 0.92rem; text-align: center; text-wrap: balance; }
 .tests { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
 .test {
-  text-align: left; display: grid; gap: 8px; padding: 12px; border-radius: 10px;
+  text-align: center; justify-items: center; display: grid; gap: 8px; padding: 12px; border-radius: 10px;
   background: #1d1c22; border: 1px solid var(--line);
 }
 .test:hover { background: #26242c; border-color: #57525e; }
@@ -120,7 +125,7 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 .pips span.on { background: var(--c); }
 .best { font-family: var(--mono); font-size: 0.72rem; }
 .best.pass { color: #5fd37a; }
-.keys { color: var(--muted); font-size: 0.8rem; }
+.keys { color: var(--muted); font-size: 0.8rem; text-align: center; }
 .keys kbd {
   font-family: var(--mono); font-size: 0.75rem; padding: 1px 6px; border-radius: 4px;
   border: 1px solid var(--line); background: #222128; color: var(--ink);
@@ -139,3 +144,5 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
   .plate { min-width: 0; padding: 9px 11px; }
   .hint { display: none; }
 }
+/* The status plate has nothing to show while the test menu is up, and would cover the sign. */
+.stage:has(#menu:not([hidden])) .plate { visibility: hidden; }
