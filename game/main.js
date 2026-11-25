@@ -768,7 +768,9 @@ function simRope(dt) {
   pinRope();
   const len = polyLen(rp);
   if (ropeFree) {
-    ropeTarget = Math.max(0.8, ropeTarget - dt * 1.6); // the reel winds the loose end back in
+    // The reel winds the loose end back in, stopping while the end still lies on the flat floor (past the
+    // stretch where the cable climbs to the socket).
+    ropeTarget = Math.max(SOCKET_DROP + 0.6, ropeTarget - dt * 1.6);
   } else {
     const rem = THREE.MathUtils.clamp(1 - needed / rope.len, 0, 1);
     const geo = taut.len + aroundBot(taut.last, rp[rp.length - 1]);
@@ -915,13 +917,24 @@ function drawCable(dt) {
     P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z;
   }
   if (ropeFree) {
-    // The loose plug rides on the end of the cable.
+    // The loose plug rides on the end of the cable. The plug is thicker than the cable, so the last
+    // stretch of cable rises smoothly to the plug's axis height; the plug then sits on the floor with
+    // the cable running straight into its boot.
+    const step = total / n, rise = 0.35, back = 0.12, axisY = PLUG_R + 0.002; // 2 mm clear of the floor
+    for (let i = n, sBack = 0; i >= 0 && sBack <= rise; i--, sBack += step) {
+      const w = 1 - sBack / rise, e = w * w * (3 - 2 * w);
+      P[i * 3 + 1] = Math.max(P[i * 3 + 1], CABLE_R + (axisY - CABLE_R) * e);
+    }
     const end = new THREE.Vector3(P[n * 3], P[n * 3 + 1], P[n * 3 + 2]);
-    const prev = new THREE.Vector3(P[(n - 3) * 3], P[(n - 3) * 3 + 1], P[(n - 3) * 3 + 2]);
-    const dir = prev.sub(end).normalize();
+    const k = Math.max(0, n - Math.max(1, Math.round(back / Math.max(step, 1e-6))));
+    const dir = new THREE.Vector3(P[k * 3], P[k * 3 + 1], P[k * 3 + 2]).sub(end);
+    if (dir.lengthSq() < 1e-10) dir.copy(botDir).negate();
+    // Resting on the floor, the plug lies level.
+    if (end.y <= axisY + 0.005) dir.y = 0;
+    if (dir.lengthSq() < 1e-10) dir.set(1, 0, 0);
+    dir.normalize();
     botPlug.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
     botPlug.position.copy(end).addScaledVector(dir, -PLUG_LEN);
-    botPlug.position.y = Math.max(PLUG_R, botPlug.position.y);
   }
 }
 
