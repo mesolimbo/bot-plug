@@ -235,11 +235,11 @@ scene.add(floor);
 const wallTex = canvasTex(256, 512, (g, w, h) => {
   for (let x = 0; x < w; x += 32) {
     const grad = g.createLinearGradient(x, 0, x + 32, 0);
-    grad.addColorStop(0, "#7a808b"); grad.addColorStop(0.45, "#626873");
-    grad.addColorStop(0.55, "#4f545e"); grad.addColorStop(1, "#6e747f");
+    grad.addColorStop(0, "#7d6a70"); grad.addColorStop(0.45, "#66545a");
+    grad.addColorStop(0.55, "#524348"); grad.addColorStop(1, "#736066");
     g.fillStyle = grad; g.fillRect(x, 0, 32, h);
   }
-  g.fillStyle = "#3d414a"; g.fillRect(0, h - 6, w, 6);
+  g.fillStyle = "#40343a"; g.fillRect(0, h - 6, w, 6);
 });
 const hazardTex = canvasTex(256, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 64));
 hazardTex.wrapS = THREE.RepeatWrapping;
@@ -258,12 +258,12 @@ roomWall(W, new THREE.Vector3(0, 0, -ROOM.z), 0);
 roomWall(W, new THREE.Vector3(0, 0, ROOM.z), Math.PI);
 roomWall(D, new THREE.Vector3(-ROOM.x, 0, 0), Math.PI / 2);
 roomWall(D, new THREE.Vector3(ROOM.x, 0, 0), -Math.PI / 2);
-const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), toon({ color: 0x1c1e24, side: THREE.DoubleSide }));
+const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), toon({ color: 0x1f191d, side: THREE.DoubleSide }));
 ceiling.rotation.x = Math.PI / 2; ceiling.position.y = ROOM.h;
 scene.add(ceiling);
 
-const steel = toon({ color: 0x343842 });
-const steelLight = toon({ color: 0x5b616c });
+const steel = toon({ color: 0x3a2e34 });
+const steelLight = toon({ color: 0x655259 });
 const wrapMat = toon({ map: canvasTex(64, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 32), [2, 2]) });
 for (let x = -8; x <= 8; x += 4) {
   for (const z of [-ROOM.z + 0.08, ROOM.z - 0.08]) {
@@ -335,33 +335,78 @@ const sign = (text, sub, w, h, pos, rotY, lit = false) => {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   m.position.copy(pos); m.rotation.y = rotY; scene.add(m);
 };
-// The main sign hangs on the front of the wall's steel ribs, on a dark backing board.
-const SIGN_AT = new THREE.Vector3(0, 5.6, -ROOM.z + 0.26);
-{
-  const board = inked(new THREE.Mesh(new THREE.BoxGeometry(9.3, 2.5, 0.08), steel));
-  board.position.set(SIGN_AT.x, SIGN_AT.y, SIGN_AT.z - 0.05); scene.add(board);
-}
-sign([["ALAN'S ", "#ece6da"], ["BOT PLUGS", "#f2b705"]], "QUALITY CONTROL CENTER - TEST FLOOR", 9, 2.2, SIGN_AT, 0, true);
+// The main sign (a modelled lightbox, loaded with the other models) hangs on the front of the wall's
+// steel ribs; its back sits 0.30 m behind its origin.
+const SIGN_AT = new THREE.Vector3(0, 5.6, -ROOM.z + 0.16 + 0.30);
 sign("GOAL", null, 3, 0.9, new THREE.Vector3(ROOM.x - 0.05, 5.4, 0), -Math.PI / 2);
 sign("TEST SOCKET", null, 3, 0.7, new THREE.Vector3(-ROOM.x + 0.05, 3.2, 0), Math.PI / 2);
 // Roller door behind the goal, for units that pass.
 const shutter = canvasTex(64, 256, (g, w, h) => {
-  for (let y = 0; y < h; y += 16) { g.fillStyle = "#6c717b"; g.fillRect(0, y, w, 10); g.fillStyle = "#4b4f58"; g.fillRect(0, y + 10, w, 6); }
+  for (let y = 0; y < h; y += 16) { g.fillStyle = "#715e62"; g.fillRect(0, y, w, 10); g.fillStyle = "#4f4146"; g.fillRect(0, y + 10, w, 6); }
 }, [5, 4]);
 const door = new THREE.Mesh(new THREE.PlaneGeometry(6, 4.2), toon({ map: shutter }));
 door.position.set(ROOM.x - 0.03, 2.1, 0); door.rotation.y = -Math.PI / 2; scene.add(door);
 
 // --- Maze walls -------------------------------------------------------------------------------
-const panelTex = canvasTex(256, 168, (g, w, h) => {
-  g.fillStyle = "#666c77"; g.fillRect(0, 0, w, h);
-  g.fillStyle = "#575d68"; g.fillRect(10, 30, w - 20, h - 40);
-  g.strokeStyle = "#454a54"; g.lineWidth = 3; g.strokeRect(10, 30, w - 20, h - 40);
-  g.fillStyle = "#8a909b";
-  for (const x of [18, w - 18]) for (const y of [40, h - 18]) { g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); }
-  g.save(); g.beginPath(); g.rect(0, 0, w, 22); g.clip(); stripes(g, w, 22, "#f2b705", "#1b1b1d", 30); g.restore();
+// Wall panels in the sign's style: a bevelled plum-gunmetal frame round a recessed, chamfered inset,
+// with a hazard band along the top, slanted vents, corner bolts and dark ink lines.
+function chamferPath(g, x0, y0, x1, y1, c) {
+  g.beginPath();
+  g.moveTo(x0 + c, y0); g.lineTo(x1 - c, y0); g.lineTo(x1, y0 + c); g.lineTo(x1, y1 - c);
+  g.lineTo(x1 - c, y1); g.lineTo(x0 + c, y1); g.lineTo(x0, y1 - c); g.lineTo(x0, y0 + c); g.closePath();
+}
+function bolt(g, x, y, r) {
+  g.fillStyle = "#8a6e70"; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  g.strokeStyle = "#161114"; g.lineWidth = 2; g.stroke();
+  g.fillStyle = "#4a3a3f"; g.beginPath(); g.arc(x + r * 0.25, y + r * 0.25, r * 0.45, 0, 7); g.fill();
+}
+const panelTex = canvasTex(512, 392, (g, w, h) => {
+  const band = 46;
+  g.fillStyle = "#5e4a50"; g.fillRect(0, 0, w, h);
+  // Frame bevel: lit top-left edges, shadowed bottom-right.
+  g.fillStyle = "#7a5f60"; g.fillRect(0, band, w, 5); g.fillRect(0, band, 5, h - band);
+  g.fillStyle = "#2d242b"; g.fillRect(0, h - 6, w, 6); g.fillRect(w - 6, band, 6, h - band);
+  // Recessed inset with a shadow along its top and left, a lit lower edge, and a seam across it.
+  const ix0 = 34, iy0 = band + 30, ix1 = w - 34, iy1 = h - 30;
+  chamferPath(g, ix0, iy0, ix1, iy1, 22); g.fillStyle = "#3f3238"; g.fill();
+  g.save(); chamferPath(g, ix0, iy0, ix1, iy1, 22); g.clip();
+  g.fillStyle = "#2a2126"; g.fillRect(ix0, iy0, ix1 - ix0, 9); g.fillRect(ix0, iy0, 9, iy1 - iy0);
+  g.fillStyle = "#5a4549"; g.fillRect(ix0, iy1 - 5, ix1 - ix0, 5);
+  const seam = Math.round((iy0 + iy1) / 2);
+  g.fillStyle = "#241c21"; g.fillRect(ix0, seam - 2, ix1 - ix0, 4);
+  g.fillStyle = "#56434a"; g.fillRect(ix0, seam + 2, ix1 - ix0, 2);
+  // Slanted vents low on the right, like the sign's.
+  g.fillStyle = "#1a1418";
+  for (let k = 0; k < 4; k++) {
+    const x = ix1 - 120 + k * 22, y = iy1 - 52;
+    g.beginPath(); g.moveTo(x, y + 30); g.lineTo(x + 12, y); g.lineTo(x + 20, y); g.lineTo(x + 8, y + 30); g.closePath(); g.fill();
+  }
+  g.restore();
+  chamferPath(g, ix0, iy0, ix1, iy1, 22); g.strokeStyle = "#161114"; g.lineWidth = 3; g.stroke();
+  for (const x of [17, w - 17]) for (const y of [band + 17, h - 17]) bolt(g, x, y, 7);
+  g.save(); g.beginPath(); g.rect(0, 0, w, band); g.clip(); stripes(g, w, band, "#f2b705", "#1b1b1d", 60); g.restore();
+  g.fillStyle = "#161114"; g.fillRect(0, band - 3, w, 3);
 });
 const panelMat = toon({ map: panelTex });
-const postMat = toon({ color: 0x3b3f48 });
+const wallEdgeMat = toon({ color: 0x3a2e34 });     // panel ends and the top rail
+// Posts: a lit left edge, a centre seam groove, and bolts near the top and bottom.
+const postMat = toon({ map: canvasTex(128, 384, (g, w, h) => {
+  g.fillStyle = "#463840"; g.fillRect(0, 0, w, h);
+  g.fillStyle = "#6a5256"; g.fillRect(0, 0, 6, h);
+  g.fillStyle = "#2a2126"; g.fillRect(w - 7, 0, 7, h);
+  g.fillStyle = "#241c21"; g.fillRect(w / 2 - 3, 18, 6, h - 36);
+  g.fillStyle = "#5c4a50"; g.fillRect(w / 2 + 3, 18, 2, h - 36);
+  for (const y of [30, h - 30]) for (const x of [26, w - 26]) bolt(g, x, y, 7);
+}) });
+const lightBarMat = new THREE.MeshBasicMaterial({ color: 0xffc35a });
+// Light-strip layouts along the top of a panel, as [centre, length] in metres from its middle.
+const LIGHT_LAYOUTS = [
+  [[-0.42, 0.42]],                                   // one strip, left
+  [[0.42, 0.42]],                                    // one strip, right
+  [[0, 0.62]],                                       // one long strip, centred
+  [[-0.45, 0.3], [0.45, 0.3]],                       // a pair at the ends
+  [[-0.38, 0.16], [-0.16, 0.16], [0.06, 0.16]],      // a row of three short ones
+];
 const capMat = toon({ map: canvasTex(64, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 24)) });
 const walls = []; // { minX, maxX, minZ, maxZ, mesh, rise, target, h }
 // Panels stop at the posts and posts stand alone at each grid point, so no two wall
@@ -403,9 +448,31 @@ function buildWalls(test) {
   for (const b of wallBoxes(test)) {
     const old = have.get(wallKey(b));
     if (old) { old.target = 1; keep.add(old); continue; }
-    const mesh = inked(new THREE.Mesh(new THREE.BoxGeometry(b.sx, b.h, b.sz), b.post ? postMat : panelMat));
+    // Panels show the panel texture on their two long faces only; box faces run +x, -x, +y, -y, +z, -z.
+    const alongX = b.sx > b.sz;
+    const mats = b.post ? postMat : alongX
+      ? [wallEdgeMat, wallEdgeMat, wallEdgeMat, wallEdgeMat, panelMat, panelMat]
+      : [panelMat, panelMat, wallEdgeMat, wallEdgeMat, wallEdgeMat, wallEdgeMat];
+    const mesh = inked(new THREE.Mesh(new THREE.BoxGeometry(b.sx, b.h, b.sz), mats));
     mesh.castShadow = true; mesh.receiveShadow = true;
     mesh.position.set(b.cx, -b.h / 2, b.cz);
+    if (!b.post) {
+      // A raised rail along the top, and a glowing amber light bar on each face, like the sign's.
+      const len = (alongX ? b.sx : b.sz) - 0.06;
+      const rail = inked(new THREE.Mesh(alongX ? new THREE.BoxGeometry(len, 0.07, b.sz + 0.05) : new THREE.BoxGeometry(b.sx + 0.05, 0.07, len), wallEdgeMat));
+      rail.position.y = b.h / 2 + 0.035;
+      mesh.add(rail);
+      // Light strips: one of a few layouts, picked from the panel's position so it never changes.
+      const layout = LIGHT_LAYOUTS[Math.abs(Math.round(b.cx * 7 + b.cz * 13)) % LIGHT_LAYOUTS.length];
+      const off = (alongX ? b.sz : b.sx) / 2 + 0.006;
+      for (const side of [-1, 1]) {
+        for (const [at, length] of layout) {
+          const bar = inked(new THREE.Mesh(alongX ? new THREE.BoxGeometry(length, 0.045, 0.02) : new THREE.BoxGeometry(0.02, 0.045, length), lightBarMat));
+          bar.position.set(alongX ? at : side * off, 0.33, alongX ? side * off : at);
+          mesh.add(bar);
+        }
+      }
+    }
     if (b.post) {
       const cap = new THREE.Mesh(new THREE.BoxGeometry(POST + 0.02, 0.05, POST + 0.02), capMat);
       cap.position.y = b.h / 2 + 0.025;
@@ -417,6 +484,16 @@ function buildWalls(test) {
     keep.add(w);
   }
   for (const w of walls) if (!keep.has(w)) w.target = -0.02; // sink the rest
+  linkWalls();
+}
+// Each panel's links are the posts at its ends, and each post's are the panels meeting it (panels run
+// 2 cm into their posts, so their boxes overlap).
+function linkWalls() {
+  const live = walls.filter((w) => w.target > 0), e = 0.03;
+  for (const w of live) {
+    w.links = live.filter((o) => o !== w && o.post !== w.post &&
+      o.minX <= w.maxX + e && o.maxX >= w.minX - e && o.minZ <= w.maxZ + e && o.maxZ >= w.minZ - e);
+  }
 }
 function updateWalls(dt) {
   for (let k = walls.length - 1; k >= 0; k--) {
@@ -1285,7 +1362,7 @@ function setPowerLook(p) {
 }
 
 // --- Load and assemble ----------------------------------------------------------------------
-const [botGltf, plugGltf, socketGltf] = await Promise.all(["bot", "plug", "wall_socket"].map((n) => loader.loadAsync(`assets/${n}.glb`)));
+const [botGltf, plugGltf, socketGltf, signGltf] = await Promise.all(["bot", "plug", "wall_socket", "sign"].map((n) => loader.loadAsync(`assets/${n}.glb`)));
 model = botGltf.scene;
 model.position.y = 0.5;
 botRoot.add(model);
@@ -1332,6 +1409,20 @@ for (const side of ["L", "R"]) {
 }
 model.updateMatrixWorld(true);
 footRestY = legs[0][2].getWorldPosition(new THREE.Vector3()).y - botRoot.position.y;
+// Sign: the lettered face and the light bars glow (unlit); the housing takes the toon shading.
+{
+  const sign = signGltf.scene;
+  sign.traverse((o) => {
+    if (!o.isMesh) return;
+    const m = o.material, name = m.name || "";
+    o.material = /face|light/.test(name)
+      ? new THREE.MeshBasicMaterial({ map: m.map, color: 0xffffff })
+      : toon({ map: m.map || null, color: m.map ? 0xffffff : m.color });
+    o.add(new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), inkLine));
+  });
+  sign.position.copy(SIGN_AT);
+  scene.add(sign);
+}
 const socket = socketGltf.scene;
 toonify(socket);
 socket.position.copy(SOCKET_POS);
@@ -1582,11 +1673,14 @@ function ghostOf(mat) {
 function setGhost(w, on) {
   if (!!w.ghost === on) return;
   w.ghost = on;
-  for (const o of [w.mesh, ...w.mesh.children]) {
-    if (o.isLineSegments) { o.visible = !on; continue; }
+  // The whole wall, its rail, light bars and cap included; panels carry one material per face.
+  w.mesh.traverse((o) => {
+    if (o.isLineSegments) { o.visible = !on; return; }
+    if (!o.isMesh) return;
     if (!o.userData.solid) o.userData.solid = o.material;
-    o.material = on ? ghostOf(o.userData.solid) : o.userData.solid;
-  }
+    const solid = o.userData.solid;
+    o.material = !on ? solid : Array.isArray(solid) ? solid.map(ghostOf) : ghostOf(solid);
+  });
   w.mesh.castShadow = !on;
 }
 function segmentHitsBox(a, b, w) {
@@ -1602,14 +1696,35 @@ function segmentHitsBox(a, b, w) {
   }
   return true;
 }
-const _sight = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-// Never during the opening shot: the walls stay solid until the bot starts.
+const _sight = Array.from({ length: 5 }, () => new THREE.Vector3());
+// Never during the opening shot: the walls stay solid until the bot starts. A panel and the posts at its
+// ends fade together, and stay faded a moment after they stop blocking, so the view doesn't flicker
+// between a clear wall and a clear post as the camera moves.
+const FADE_HOLD = 0.35;
 function fadeBlockers() {
-  // Only sight lines to the bot himself (feet, middle, head): walls ahead of him never fade.
-  _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
-  _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
-  _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
-  for (const w of walls) setGhost(w, (follow || cheering() || mourning()) && !camIntro && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
+  const on = (follow || cheering() || mourning()) && !camIntro;
+  const now = performance.now() / 1000;
+  if (on) {
+    // Only sight lines to the bot himself (feet, middle, head, and both sides of his body): walls ahead
+    // of him never fade.
+    const vx = bot.pos.x - camera.position.x, vz = bot.pos.z - camera.position.z, vl = Math.hypot(vx, vz) || 1;
+    const sx = (-vz / vl) * 0.3, sz = (vx / vl) * 0.3;
+    _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
+    _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
+    _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
+    _sight[3].set(bot.pos.x + sx, 0.5, bot.pos.z + sz);
+    _sight[4].set(bot.pos.x - sx, 0.5, bot.pos.z - sz);
+    const group = new Set();
+    for (const w of walls) {
+      if (!_sight.some((s) => segmentHitsBox(camera.position, s, w))) continue;
+      group.add(w);
+      for (const l of w.links || []) group.add(l);
+    }
+    // A post that blocks brings in its panels; those panels bring in the posts at their other ends.
+    for (const w of [...group]) if (!w.post) for (const l of w.links || []) group.add(l);
+    for (const w of group) w.fadeUntil = now + FADE_HOLD;
+  }
+  for (const w of walls) setGhost(w, on && (w.fadeUntil || 0) > now);
 }
 // Opening shot: hold on the sign, then swing round in an arc and close in on the bot.
 const INTRO_HOLD = 1.0, INTRO_MOVE = 2.8;
