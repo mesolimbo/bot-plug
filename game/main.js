@@ -1427,7 +1427,8 @@ function finish(passed) {
   updateLevelButtons(); // a pass can unlock the next level
   const next = nextLevel(k, l);
   if (passed && next) acts.push(`<button class="primary" data-act="next">Next · ${TESTS[next[0]].level} ${next[1] + 1}/${LEVEL_COUNT}</button>`);
-  acts.push(`<button ${passed ? "" : 'class="primary"'} data-act="retry">Retry</button>`, `<button data-act="menu">Menu</button>`);
+  // Same order as the control bar: Menu, then Retry.
+  acts.push(`<button data-act="menu">Menu</button>`, `<button ${passed ? "" : 'class="primary"'} data-act="retry">Retry</button>`);
   clearTimeout(resultTimer);
   resultTimer = setTimeout(() => {
     const v = $("verdict");
