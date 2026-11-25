@@ -995,8 +995,8 @@ const KEYMAP = { KeyW: "fwd", ArrowUp: "fwd", KeyS: "back", ArrowDown: "back", K
 addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, textarea")) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
+  if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); toggleMenu(); return; }
-  if (e.code === "KeyR" && game.test !== null && $("menu").hidden) { e.preventDefault(); startTest(game.test, game.level); return; }
   const k = KEYMAP[e.code];
   if (!k || !$("menu").hidden) return;
   e.preventDefault();
@@ -1209,17 +1209,54 @@ function replug() {
 // Tip the body forward about the hip line when powered down, keeping the feet planted.
 // The mixer skips writing bones whose value hasn't changed, so its pose is restored before
 // each update; otherwise the tilt would compound every frame.
-const thighs = [];
-const pose = { saved: false, bodyPos: new THREE.Vector3(), bodyQ: new THREE.Quaternion(), thighQ: [new THREE.Quaternion(), new THREE.Quaternion()] };
+const thighs = [], legs = []; // legs: [thigh, shin, foot] per side
+const pose = { saved: false, bodyPos: new THREE.Vector3(), bodyQ: new THREE.Quaternion(), legQ: [] };
 function restorePose() {
   if (!pose.saved) return;
   bodyBone.position.copy(pose.bodyPos); bodyBone.quaternion.copy(pose.bodyQ);
-  thighs.forEach((t, i) => t.quaternion.copy(pose.thighQ[i]));
+  legs.flat().forEach((b, i) => b.quaternion.copy(pose.legQ[i]));
 }
 function savePose() {
   pose.bodyPos.copy(bodyBone.position); pose.bodyQ.copy(bodyBone.quaternion);
-  thighs.forEach((t, i) => pose.thighQ[i].copy(t.quaternion));
+  pose.legQ = legs.flat().map((b) => b.quaternion.clone());
   pose.saved = true;
+}
+// Turn a bone by angle about a world axis, keeping its parent where it is.
+function turnBone(bone, axis, angle) {
+  const world = bone.getWorldQuaternion(new THREE.Quaternion());
+  const turned = new THREE.Quaternion().setFromAxisAngle(axis, angle).multiply(world);
+  bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(turned));
+  bone.updateMatrixWorld(true);
+}
+// Joyful stomping after a pass: knees up in turn and a happy wiggle, with the other foot always
+// planted on the floor. t is seconds since he started; it eases in over the first half second.
+let footRestY = 0; // height of his feet above the floor when standing
+function applyStomp(t) {
+  if (t < 0) return;
+  const ease = Math.min(1, t / 0.5);
+  const phase = t * 1.3 * Math.PI * 2; // 1.3 stomps a second: left knee up, then right
+  model.updateMatrixWorld(true);
+  const side = new THREE.Vector3(0, 0, 1).applyQuaternion(botRoot.quaternion);   // knee-up axis
+  const ahead = new THREE.Vector3(1, 0, 0).applyQuaternion(botRoot.quaternion);  // wiggle axis
+  const body = bodyBone;
+  const legWorld = legs.map(([thigh]) => thigh.getWorldQuaternion(new THREE.Quaternion()));
+  // Rock over onto the planted leg as the other knee comes up: one full rock per left-right pair.
+  turnBone(body, ahead, 0.12 * Math.sin(phase) * ease);
+  // Keep the legs hanging straight down under the wiggling body before lifting them.
+  const bodyInv = body.getWorldQuaternion(new THREE.Quaternion()).invert();
+  legs.forEach(([thigh], i) => { thigh.quaternion.copy(bodyInv.clone().multiply(legWorld[i])); thigh.updateMatrixWorld(true); });
+  // The two lifts are never above zero together, so one foot is always down.
+  const lifts = legs.map((_, i) => 0.85 * Math.max(0, Math.sin(phase + i * Math.PI)) ** 1.5 * ease);
+  legs.forEach(([thigh, shin, foot], i) => {
+    turnBone(thigh, side, lifts[i]);
+    turnBone(shin, side, -1.8 * lifts[i]);
+    turnBone(foot, side, 0.8 * lifts[i]);
+  });
+  // Move the body so the lower foot (the planted one) sits exactly on the floor.
+  const low = Math.min(...legs.map(([, , foot]) => foot.getWorldPosition(new THREE.Vector3()).y));
+  const dy = footRestY - (low - botRoot.position.y);
+  body.position.copy(body.parent.worldToLocal(body.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, dy, 0))));
+  body.updateMatrixWorld(true);
 }
 function applySlump(s) {
   if (s <= 0) return;
@@ -1289,7 +1326,12 @@ botPlug = plugTemplate.clone();
   bodyBone.add(botPlug);
 }
 const boneOf = (name) => model.getObjectByName(name.replace(".", "")) || model.getObjectByName(name);
-for (const side of ["L", "R"]) thighs.push(boneOf(`thigh.${side}`));
+for (const side of ["L", "R"]) {
+  thighs.push(boneOf(`thigh.${side}`));
+  legs.push([boneOf(`thigh.${side}`), boneOf(`shin.${side}`), boneOf(`foot.${side}`)]);
+}
+model.updateMatrixWorld(true);
+footRestY = legs[0][2].getWorldPosition(new THREE.Vector3()).y - botRoot.position.y;
 const socket = socketGltf.scene;
 toonify(socket);
 socket.position.copy(SOCKET_POS);
@@ -1313,7 +1355,7 @@ function layCable() {
 }
 
 // --- Game state -------------------------------------------------------------------------------
-const game = { test: null, level: 0, run: 0, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false };
+const game = { test: null, level: 0, run: 0, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false, cheer: 0 };
 // Best times by "difficulty.level". Times saved before levels existed count as level 1.
 let best = {};
 try { best = JSON.parse(localStorage.getItem("abp-best") || "{}"); } catch { best = {}; }
@@ -1321,8 +1363,9 @@ for (const key of Object.keys(best)) {
   if (/^\d+$/.test(key)) { best[`${key}.0`] ??= best[key]; delete best[key]; }
 }
 const bestOf = (k, l) => best[`${k}.${l}`];
-// A difficulty starts at its first level not yet passed.
-const firstOpen = (k) => Math.max(0, LEVELS[k].findIndex((_, l) => !bestOf(k, l)));
+// A difficulty starts at its first level not yet passed (the last one once all are passed). That is
+// also as far as the next-level button goes.
+const firstOpen = (k) => { const i = LEVELS[k].findIndex((_, l) => !bestOf(k, l)); return i < 0 ? LEVEL_COUNT - 1 : i; };
 const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
 // withIntro: the camera opens on the sign, then swings round and closes in on the bot before he walks.
@@ -1337,6 +1380,7 @@ function startTest(k, l, withIntro = false) {
   document.documentElement.style.setProperty("--accent", t.hex);
   cableMat.color.set(t.hex);
   $("testName").textContent = `${t.level} · ${l + 1}/${LEVEL_COUNT}`;
+  updateLevelButtons();
   $("pullLim").textContent = `${Math.round(t.spare * 1000) / 10}%`;
   if (unplugged) replug();
   power = 1;
@@ -1361,6 +1405,7 @@ function beginPlay() {
 function finish(passed) {
   if (game.state !== "playing") return;
   game.state = passed ? "passed" : "failed";
+  game.cheer = game.time + 0.4; // he settles for a moment, then stomps for joy
   const k = game.test, l = game.level, t = LEVELS[k][l], key = `${k}.${l}`;
   const time = game.started === null ? 0 : game.time - game.started;
   const progress = THREE.MathUtils.clamp((bot.pos.x - START.x) / (GOAL_X - START.x), 0, 1);
@@ -1371,16 +1416,17 @@ function finish(passed) {
   }
   // Settle the card's contents now; it only appears after a beat, and is dropped if a new test starts.
   const rows = [
-    ["Level", `${t.level} ${l + 1}/${LEVEL_COUNT} · ${t.name.toLowerCase()} cable`],
-    ["Cable", `${t.len.toFixed(1)} m · ${Math.round(t.spare * 1000) / 10}% spare`],
+    ["Level", `${t.level} ${l + 1}/${LEVEL_COUNT}`],
+    ["Cable", `${t.len.toFixed(1)} m · ${Math.round(t.spare * 1000) / 10}%`],
     passed ? ["Time", fmt(time) + (isBest ? " · best" : "")] : ["Route covered", `${Math.round(progress * 100)}%`],
-    ["Least cable left", `${Math.max(0, t.len * (1 - game.peak)).toFixed(1)} m`],
+    ["Least left", `${Math.max(0, t.len * (1 - game.peak)).toFixed(1)} m`],
   ];
-  if (game.autopilot) rows.push(["Driver", "Autopilot (no best time)"]);
+  if (game.autopilot) rows.push(["Driver", "Autopilot"]);
   const acts = [];
+  updateLevelButtons(); // a pass can unlock the next level
   const next = nextLevel(k, l);
-  if (passed && next) acts.push(`<button class="primary" data-act="next">Next level · ${TESTS[next[0]].level} ${next[1] + 1}/${LEVEL_COUNT}</button>`);
-  acts.push(`<button ${passed ? "" : 'class="primary"'} data-act="retry">Retry</button>`, `<button data-act="menu">All tests</button>`);
+  if (passed && next) acts.push(`<button class="primary" data-act="next">Next · ${TESTS[next[0]].level} ${next[1] + 1}/${LEVEL_COUNT}</button>`);
+  acts.push(`<button ${passed ? "" : 'class="primary"'} data-act="retry">Retry</button>`, `<button data-act="menu">Menu</button>`);
   clearTimeout(resultTimer);
   resultTimer = setTimeout(() => {
     const v = $("verdict");
@@ -1388,6 +1434,8 @@ function finish(passed) {
     v.className = "verdict " + (passed ? "pass" : "fail");
     $("stats").innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
     $("actions").innerHTML = acts.join("");
+    const below = document.querySelector(".rail").getBoundingClientRect().bottom - stage.getBoundingClientRect().top;
+    $("result").style.paddingTop = `${Math.round(below + 10)}px`;
     $("result").hidden = false;
   }, passed ? 600 : 1600);
 }
@@ -1430,6 +1478,14 @@ function toggleMenu() {
 }
 $("menuBtn").onclick = showMenu;
 $("restart").onclick = () => { if (game.test !== null) startTest(game.test, game.level); };
+// Step back through this difficulty's levels, or forward up to the one you're trying to beat.
+function updateLevelButtons() {
+  const on = game.test !== null;
+  $("prevLevel").disabled = !on || game.level <= 0;
+  $("nextLevel").disabled = !on || game.level >= firstOpen(game.test);
+}
+$("prevLevel").onclick = () => { if (!$("prevLevel").disabled) startTest(game.test, game.level - 1); $("prevLevel").blur(); };
+$("nextLevel").onclick = () => { if (!$("nextLevel").disabled) startTest(game.test, game.level + 1); $("nextLevel").blur(); };
 
 // --- Camera and controls -------------------------------------------------------------------------
 // Follow: over the bot's shoulder, just above the wall tops, turning as he turns.
@@ -1444,7 +1500,34 @@ function overheadMax() {
   const v = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   return Math.min(ROOM.h - 2.8, (COLS * CELL * 0.8) / (v * camera.aspect), (ROWS * CELL * 0.8) / v);
 }
+// After a pass the camera swings round to face him, as close as the room behind him allows.
+const cheering = () => game.state === "passed" && !camIntro;
+// After an unplug the camera circles him slowly, above the wall tops, so his face and his open plug
+// come round in turn.
+const mourning = () => game.state === "failed" && !camIntro;
+const ORBIT_SPEED = 0.6, ORBIT_DIST = 1.7, ORBIT_UP = 1.55;
 function camGoal() {
+  if (mourning()) {
+    const fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
+    camGoalPos.set(bot.pos.x - fx * ORBIT_DIST, ORBIT_UP, bot.pos.z - fz * ORBIT_DIST);
+    camGoalPos.x = THREE.MathUtils.clamp(camGoalPos.x, -ROOM.x + 0.3, ROOM.x - 0.3);
+    camGoalPos.z = THREE.MathUtils.clamp(camGoalPos.z, -ROOM.z + 0.3, ROOM.z - 0.3);
+    camGoalLook.set(bot.pos.x, 0.45, bot.pos.z);
+    return;
+  }
+  if (cheering()) {
+    const fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
+    let reach = 2.0;
+    if (fx > 1e-3) reach = Math.min(reach, (ROOM.x - 0.3 - bot.pos.x) / fx);
+    if (fx < -1e-3) reach = Math.min(reach, (-ROOM.x + 0.3 - bot.pos.x) / fx);
+    if (fz > 1e-3) reach = Math.min(reach, (ROOM.z - 0.3 - bot.pos.z) / fz);
+    if (fz < -1e-3) reach = Math.min(reach, (-ROOM.z + 0.3 - bot.pos.z) / fz);
+    reach = Math.max(1.0, reach);
+    camGoalPos.set(bot.pos.x - fx * reach, 0.75 + reach * 0.2, bot.pos.z - fz * reach);
+    // Aim a little to his left so he sits right of centre, clear of the results card.
+    camGoalLook.set(bot.pos.x + fz * 0.35, 0.55, bot.pos.z - fx * 0.35);
+    return;
+  }
   if (follow) {
     const fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
     camGoalPos.set(bot.pos.x - fx * FOLLOW_BACK, FOLLOW_UP, bot.pos.z - fz * FOLLOW_BACK);
@@ -1506,7 +1589,7 @@ function fadeBlockers() {
   _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
   _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
   _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
-  for (const w of walls) setGhost(w, follow && !camIntro && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
+  for (const w of walls) setGhost(w, (follow || cheering() || mourning()) && !camIntro && _sight.some((s) => segmentHitsBox(camera.position, s, w)));
 }
 // Opening shot: hold on the sign, then swing round in an arc and close in on the bot.
 const INTRO_HOLD = 1.0, INTRO_MOVE = 2.8;
@@ -1532,7 +1615,14 @@ function introCamera(dt) {
   }
 }
 function updateCamera(dt, snap) {
-  camYaw += angleDiff(bot.heading, camYaw) * (snap ? 1 : 1 - Math.exp(-dt * 3));
+  // The status plate only shows once the opening shot is over and the level is ready.
+  stage.classList.toggle("intro", !!camIntro);
+  // Behind him while playing; swung round in front of him (a slower, wider arc) after a pass.
+  if (mourning()) camYaw += ORBIT_SPEED * dt;
+  else {
+    const yawGoal = bot.heading + (cheering() ? Math.PI : 0);
+    camYaw += angleDiff(yawGoal, camYaw) * (snap ? 1 : 1 - Math.exp(-dt * (cheering() ? 1.6 : 3)));
+  }
   overheadH = THREE.MathUtils.clamp(overheadH, OVERHEAD_MIN, overheadMax());
   camGoal();
   if (camIntro) {
@@ -1548,12 +1638,11 @@ function updateCamera(dt, snap) {
 }
 function setCam(mode) {
   follow = mode === "follow";
-  $("camFollow").setAttribute("aria-pressed", String(follow));
-  $("camOverhead").setAttribute("aria-pressed", String(!follow));
-  $("camFollow").blur(); $("camOverhead").blur();
+  $("camToggle").setAttribute("aria-checked", String(!follow));
+  $("camToggle").title = `Camera: ${follow ? "Follow" : "Overhead"}`;
+  $("camToggle").blur();
 }
-$("camFollow").onclick = () => setCam("follow");
-$("camOverhead").onclick = () => setCam("overhead");
+$("camToggle").onclick = () => setCam(follow ? "overhead" : "follow");
 renderer.domElement.addEventListener("wheel", (e) => {
   e.preventDefault();
   if (!follow) overheadH = THREE.MathUtils.clamp(overheadH * Math.exp(e.deltaY * 0.0012), OVERHEAD_MIN, overheadMax());
@@ -1569,11 +1658,6 @@ function setDrive(isManual) {
 }
 if (new URLSearchParams(location.search).has("autopilot")) setDrive(false);
 let paused = false;
-$("pause").onclick = () => {
-  paused = !paused;
-  $("pause").textContent = paused ? "Resume" : "Pause";
-  $("pause").setAttribute("aria-pressed", String(paused));
-};
 function resize() {
   const { clientWidth: w, clientHeight: h } = stage;
   renderer.setSize(w, h, false);
@@ -1621,6 +1705,7 @@ renderer.setAnimationLoop(() => {
     savePose();
     power = unplugged ? Math.max(0, power - dt / 1.2) : Math.min(1, power + dt / 0.8);
     applySlump(1 - power);
+    if (game.state === "passed") applyStomp(game.time - game.cheer);
     setPowerLook(power);
     updatePins();
     if (!unplugged && game.state !== "menu") {
@@ -1658,7 +1743,7 @@ renderer.setAnimationLoop(() => {
     }
     $("meter").style.width = ((left / rope.len) * 100).toFixed(0) + "%";
     // Nearly out: the bar and the cable-used figure blink red together.
-    const blink = low && !unplugged;
+    const blink = low && !unplugged && game.state === "playing";
     $("meterBox").classList.toggle("warn", blink);
     $("cableUsed").classList.toggle("warn", blink);
     $("toGoal").textContent = Math.max(0, GOAL_X - bot.pos.x).toFixed(1) + " m";

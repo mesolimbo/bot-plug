@@ -12,42 +12,48 @@
 
 <div class="stage" id="stage">
   <canvas id="view"></canvas>
-  <div class="plate">
-    <h1>Alan's Bot Plugs</h1>
-    <span class="stripe"></span>
-    <dl class="readout">
-      <dt>Level</dt><dd><span class="tag"><i id="tagDot"></i><span id="testName">—</span></span></dd>
-      <dt>Cable used</dt><dd id="cableLen"><span id="cableUsed">—</span><span id="cableTotal"></span></dd>
-      <dt>Spare</dt><dd id="pullLim">—</dd>
-      <dt>Unit</dt><dd><span class="status" id="state">Ready</span></dd>
-      <dt>To goal</dt><dd id="toGoal">—</dd>
-      <dt>Time</dt><dd id="clock">0:00.0</dd>
-    </dl>
-    <div class="meter" id="meterBox" aria-hidden="true"><span id="meter"></span></div>
-  </div>
-  <div class="rail">
-    <div class="group">
-      <button id="menuBtn">Tests</button>
-      <button id="restart">Restart</button>
-      <button id="pause" aria-pressed="false">Pause</button>
+  <!-- Status plate, then the control bar; the results card appears under them. -->
+  <div class="hud">
+    <div class="plate">
+      <h1>Alan's <em>Bot Plugs</em></h1>
+      <span class="stripe"></span>
+      <dl class="readout">
+        <dt>Level</dt><dd><span class="tag"><i id="tagDot"></i><span id="testName">—</span></span></dd>
+        <dt>Cable used</dt><dd id="cableLen"><span id="cableUsed">—</span><span id="cableTotal"></span></dd>
+        <dt>Spare</dt><dd id="pullLim">—</dd>
+        <dt>Unit</dt><dd><span class="status" id="state">Ready</span></dd>
+        <dt>To goal</dt><dd id="toGoal">—</dd>
+        <dt>Time</dt><dd id="clock">0:00.0</dd>
+      </dl>
+      <div class="meter" id="meterBox" aria-hidden="true"><span id="meter"></span></div>
     </div>
-    <div class="group">
-      <span class="label">Camera</span>
-      <span class="seg">
-        <button id="camFollow" aria-pressed="true">Follow</button>
-        <button id="camOverhead" aria-pressed="false">Overhead</button>
+    <div class="rail">
+      <button id="menuBtn" class="icon" aria-label="Menu" title="Menu (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <button id="restart" class="icon" aria-label="Restart level" title="Restart level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4 4v4.5h4.5"/></svg>
+      </button>
+      <button id="prevLevel" class="icon" aria-label="Previous level" title="Previous level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <button id="nextLevel" class="icon" aria-label="Next level" title="Next level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <span class="cam">
+        <button id="camToggle" class="switch" role="switch" aria-checked="false" aria-label="Overhead camera" title="Camera: Follow"><span class="knob"></span></button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg>
       </span>
     </div>
-    <span class="hint" id="hint">W A S D or arrow keys · R restart · Esc tests</span>
   </div>
 
   <div class="overlay" id="menu" hidden>
     <div class="card">
       <div class="brand">
-        <p>Navigate the maze without disconnecting the power cable from the bot plug. Select the difficulty level below.</p>
+        <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty level below.</p>
       </div>
       <div class="tests" id="tests"></div>
-      <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>R</kbd> restart · <kbd>Esc</kbd> tests</div>
+      <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
     </div>
   </div>
 
