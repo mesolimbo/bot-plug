@@ -1545,9 +1545,9 @@ function renderMenu() {
     // Levels passed in this difficulty, and the total of their best times.
     const times = LEVELS[k].map((_, l) => bestOf(k, l)).filter((v) => v);
     const total = times.reduce((a, v) => a + v, 0);
-    const coil = `<svg class="coil" viewBox="0 0 120 34" aria-hidden="true">
-      <path d="M4 26 C 20 4, 34 4, 40 17 S 60 30, 70 17 S 92 4, 100 17 S 112 28, 116 20" fill="none" stroke="#101114" stroke-width="9" stroke-linecap="round"/>
-      <path d="M4 26 C 20 4, 34 4, 40 17 S 60 30, 70 17 S 92 4, 100 17 S 112 28, 116 20" fill="none" stroke="${t.hex}" stroke-width="5" stroke-linecap="round"/></svg>`;
+    const coil = `<svg class="coil" viewBox="0 0 120 14" aria-hidden="true">
+      <path d="M6 7 H 114" fill="none" stroke="#101114" stroke-width="9" stroke-linecap="round"/>
+      <path d="M6 7 H 114" fill="none" stroke="${t.hex}" stroke-width="5" stroke-linecap="round"/></svg>`;
     const pips = Array.from({ length: LEVEL_COUNT }, (_, i) => `<span class="${i < times.length ? "on" : ""}"></span>`).join("");
     return `<button class="test" data-k="${k}" style="--c:${t.hex}">
       ${coil}<b>${t.level}</b><small>${LEVEL_COUNT} levels<br>${Math.round(t.spare * 1000) / 10}% slack</small>

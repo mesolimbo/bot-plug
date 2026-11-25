@@ -39,13 +39,24 @@ body {
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* Top-left column: status plate, then the control bar. */
-/* One frosted, blurred, dark hazard-yellow backing behind the whole column, 10 px round the panels. */
+/* The HUD column sits in a modelled steel frame (rendered in Blender to match the sign), one image per
+   state; inside it, a dark blurred backing fills the gaps between the panels. */
 .hud {
-  position: absolute; top: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 10px;
+  position: absolute; top: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 6px;
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
-  background: rgba(38, 30, 5, 0.86); border-radius: 16px;
-  -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
+  border: 14px solid transparent; border-image: url(assets/frame-bar.png) 28 / 14px stretch;
+  isolation: isolate;
 }
+/* The dark blurred pane fills exactly the frame's opening (the padding box), with its small cut
+   corners, so it never shows past the frame. */
+.hud::before, .frost::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: rgba(14, 11, 13, 0.6);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
+  clip-path: polygon(3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px), 0 3px);
+}
+.hud:has(#result:not([hidden])) { border-image-source: url(assets/frame-results.png); }
+.hud.folded { border-image-source: url(assets/frame-mini.png); }
 .plate {
   position: relative; display: grid; gap: 8px; padding: 12px 14px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -128,10 +139,10 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 #menu::after { content: ""; flex: 2 1 16px; }
 #menu .frost { flex: 0 1 auto; min-height: 0; display: flex; width: min(780px, 100%); box-sizing: border-box; }
 #menu .frost .card { width: 100%; max-height: none; overflow: visible; }
-/* The same frosted backing as the HUD column, 10 px round the card. */
+/* The menu card sits in the same kind of modelled steel frame as the HUD column. */
 .frost {
-  padding: 10px; border-radius: 16px; background: rgba(38, 30, 5, 0.86);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1); backdrop-filter: blur(12px) saturate(1.1);
+  padding: 6px; border: 14px solid transparent; border-image: url(assets/frame-menu.png) 28 / 14px stretch;
+  position: relative; isolation: isolate;
 }
 #menu .card { background: rgba(18, 19, 23, 0.96); }
 .brand { display: grid; gap: 6px; }
@@ -140,12 +151,14 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 .brand .line { white-space: nowrap; }
 @media (max-width: 640px) { .brand .line { white-space: normal; } }
 .tests { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+/* Difficulty buttons sit on a modelled plate (rendered in Blender like the frames and keycaps). */
 .test {
-  text-align: center; justify-items: center; display: grid; gap: 8px; padding: 12px; border-radius: 10px;
-  background: #1d1c22; border: 1px solid var(--line);
+  text-align: center; justify-items: center; display: grid; gap: 8px; padding: 4px 2px; border-radius: 0;
+  background: none; border: 10px solid transparent; border-image: url(assets/cardplate.png) 20 fill / 10px stretch;
 }
-.test:hover { background: #26242c; border-color: #57525e; }
-.coil { height: 34px; width: 100%; max-width: 120px; }
+.test:hover { background: none; filter: brightness(1.25); }
+.test:active { filter: brightness(0.9); }
+.coil { height: 14px; width: 100%; max-width: 110px; margin-top: 6px; }
 .test { min-width: 0; }
 .test b { font-family: var(--display); font-size: 1rem; letter-spacing: 0.04em; }
 .test small { font-family: var(--mono); color: var(--muted); font-size: 0.72rem; }
@@ -155,10 +168,17 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 .best { font-family: var(--mono); font-size: 0.72rem; }
 .best.pass { color: #5fd37a; }
 .keys { color: var(--muted); font-size: 0.8rem; text-align: center; }
+/* Key hints sit on a modelled keycap (rendered in Blender like the frames); 9-slice so Esc can be wider. */
 .keys kbd {
-  font-family: var(--mono); font-size: 0.75rem; padding: 1px 6px; border-radius: 4px;
-  border: 1px solid var(--line); background: #222128; color: var(--ink);
+  display: inline-grid; place-items: center; box-sizing: border-box; min-width: 24px; height: 24px;
+  padding: 0 1px; margin: 0 1px; vertical-align: middle;
+  border: 6px solid transparent; border-image: url(assets/keycap.png) 24 fill / 6px stretch;
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 600; line-height: 1; color: var(--ink);
+  text-shadow: 0 1px 0 #0d0a0c;
 }
+/* A wider gap where a key meets the text: after D, and either side of Esc. */
+.keys kbd:nth-of-type(4) { margin-right: 7px; }
+.keys kbd:nth-of-type(5) { margin-inline: 7px; }
 .verdict { font-family: var(--display); font-weight: 700; font-size: 2.2rem; letter-spacing: 0.08em; margin: 0; }
 .verdict.pass { color: #5fd37a; }
 .verdict.fail { color: #e5484d; }
