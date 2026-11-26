@@ -1088,7 +1088,7 @@ const keys = new Set();
 const KEYMAP = { KeyW: "fwd", ArrowUp: "fwd", KeyS: "back", ArrowDown: "back", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right",
 };
 addEventListener("keydown", (e) => {
-  if (e.target.closest?.("input, textarea")) return;
+  if (e.target.closest?.("input, textarea") && !(e.code === "Escape" && e.target.type === "range")) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); toggleMenu(); return; }
@@ -1594,7 +1594,7 @@ $("tests").addEventListener("click", (e) => {
   const k = e.target.closest(".test")?.dataset.k;
   if (k !== undefined) startTest(Number(k), firstOpen(Number(k)), true);
 });
-function showMenu() { renderMenu(); $("result").hidden = true; $("menu").hidden = false; fitMenu(); }
+function showMenu() { renderMenu(); showSound(false); $("result").hidden = true; $("menu").hidden = false; fitMenu(); }
 // Shrink the whole menu to fit the space under the sign rather than letting it scroll.
 function fitMenu() {
   const menu = $("menu"), frost = menu.querySelector(".frost");
@@ -1606,10 +1606,78 @@ function fitMenu() {
 }
 addEventListener("resize", fitMenu);
 function toggleMenu() {
+  if (!$("menu").hidden && !$("soundView").inert) { showSound(false); return; }
   if (!$("menu").hidden && game.test !== null) { $("menu").hidden = true; return; }
   showMenu();
 }
 $("menuBtn").onclick = showMenu;
+
+// Sound settings: a volume and mute per channel, remembered between visits. Audio code reads
+// soundGain("bgm") or soundGain("fx") and can listen with onSoundChange(fn).
+const SOUND_CHANNELS = { bgm: "BGM", fx: "FX" };
+const sound = { bgm: { vol: 0.7, muted: false }, fx: { vol: 0.8, muted: false } };
+try { Object.entries(JSON.parse(localStorage.getItem("abp-sound") || "{}")).forEach(([k, v]) => sound[k] && Object.assign(sound[k], v)); } catch { /* storage unavailable */ }
+const soundListeners = new Set();
+const soundGain = (k) => (sound[k].muted ? 0 : sound[k].vol);
+const onSoundChange = (fn) => soundListeners.add(fn);
+const SPEAKER = '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>';
+const WAVES = '<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>';
+const CROSS = '<path d="M16 9.5l5 5M21 9.5l-5 5"/>';
+function renderSound() {
+  $("mix").innerHTML = Object.entries(SOUND_CHANNELS).map(([k, name]) => {
+    const s = sound[k], pct = Math.round(s.vol * 100);
+    return `<div class="row ${s.muted ? "muted" : ""}" data-k="${k}">
+      <label for="vol-${k}">${name}</label>
+      <button class="icon" data-mute aria-pressed="${s.muted}" aria-label="Mute ${name}" title="${s.muted ? "Unmute" : "Mute"} ${name}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">${SPEAKER}${s.muted ? CROSS : WAVES}</svg></button>
+      <input type="range" id="vol-${k}" min="0" max="100" step="1" value="${pct}">
+      <output for="vol-${k}">${pct}%</output></div>`;
+  }).join("");
+}
+function saveSound() {
+  try { localStorage.setItem("abp-sound", JSON.stringify(sound)); } catch { /* storage unavailable */ }
+  soundListeners.forEach((fn) => fn(sound));
+}
+$("mix").addEventListener("input", (e) => {
+  const row = e.target.closest(".row");
+  if (!row || e.target.type !== "range") return;
+  const s = sound[row.dataset.k];
+  s.vol = e.target.value / 100;
+  row.querySelector("output").textContent = `${e.target.value}%`;
+  saveSound();
+});
+$("mix").addEventListener("click", (e) => {
+  const row = e.target.closest(".row");
+  if (!row || !e.target.closest("[data-mute]")) return;
+  sound[row.dataset.k].muted = !sound[row.dataset.k].muted;
+  renderSound(); saveSound();
+  $("mix").querySelector(`[data-k="${row.dataset.k}"] [data-mute]`).focus();
+});
+// Erasing progress asks first, in place of the button.
+const ERASE_INFO = "Best times and unlocked levels in every difficulty.";
+function setErase(mode) {
+  $("erase").className = `erase ${mode}`;
+  $("eraseMsg").textContent = mode === "ask" ? "Erase all progress? This can't be undone." : mode === "done" ? "Progress erased." : ERASE_INFO;
+  $("eraseBtn").hidden = mode !== "";
+  $("eraseNo").hidden = $("eraseYes").hidden = mode !== "ask";
+}
+$("eraseBtn").onclick = () => { setErase("ask"); $("eraseNo").focus(); };
+$("eraseNo").onclick = () => { setErase(""); $("eraseBtn").focus(); };
+$("eraseYes").onclick = () => {
+  for (const key of Object.keys(best)) delete best[key];
+  try { localStorage.removeItem("abp-best"); } catch { /* storage unavailable */ }
+  renderMenu(); updateLevelButtons();
+  setErase("done"); $("soundBack").focus();
+};
+function showSound(on) {
+  if (on) { renderSound(); setErase(""); }
+  $("mainView").inert = on; $("soundView").inert = !on;
+  $("settingsBtn").setAttribute("aria-expanded", String(on));
+  $("settingsBtn").title = $("settingsBtn").ariaLabel = on ? "Back to levels" : "Settings";
+  if (on) $("soundView").querySelector("input")?.focus();
+}
+$("settingsBtn").onclick = () => showSound($("soundView").inert);
+$("soundBack").onclick = () => { showSound(false); $("settingsBtn").focus(); };
 // Fold the HUD down to its title bar; remembered between visits.
 function setFolded(on) {
   document.querySelector(".hud").classList.toggle("folded", on);

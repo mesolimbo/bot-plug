@@ -144,7 +144,35 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
   padding: 6px; border: 14px solid transparent; border-image: url(assets/frame-menu.png) 28 / 14px stretch;
   position: relative; isolation: isolate;
 }
-#menu .card { background: rgba(18, 19, 23, 0.96); }
+#menu .card { background: rgba(18, 19, 23, 0.96); position: relative; }
+/* The difficulty and sound views share one grid cell, so the card keeps its size when they swap. */
+#menu .card { grid-template-areas: "v"; }
+.view { grid-area: v; display: grid; gap: 16px; align-content: start; min-width: 0; }
+.view[inert] { visibility: hidden; }
+.cog { position: absolute; top: 10px; right: 10px; z-index: 1; background: transparent; border-color: transparent; color: var(--muted); }
+.cog:hover, .cog[aria-expanded="true"] { background: #2b2930; color: var(--ink); }
+.cog svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sound { align-content: center; justify-items: center; gap: 18px; }
+.sound section { display: grid; justify-items: center; gap: 10px; }
+.sound h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.erase { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; font-size: 0.85rem; color: var(--muted); }
+.erase.ask #eraseMsg { color: var(--ink); }
+.erase.done #eraseMsg { color: #5fd37a; }
+button.danger { color: #ff8a8d; border-color: #6b3034; }
+button.danger:hover { background: #3a2226; }
+button.danger.strong { background: #c9353b; border-color: #c9353b; color: #fff; font-weight: 600; }
+button.danger.strong:hover { background: #dc4248; }
+.mix { display: grid; grid-template-columns: auto auto minmax(120px, 280px) 3.5em; align-items: center; gap: 12px 14px; }
+.mix .row { display: contents; }
+.mix label { font-family: var(--display); font-weight: 600; letter-spacing: 0.04em; }
+.mix output { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mix button.icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mix input[type="range"] { width: 100%; accent-color: var(--hazard); }
+.mix input[type="range"]:focus { outline: none; }
+.mix input[type="range"]:focus-visible { outline: 2px solid var(--hazard); outline-offset: 4px; border-radius: 4px; }
+.mix .muted input[type="range"], .mix .muted output { opacity: 0.4; }
+.sound .actions { justify-content: center; }
+.sound .actions button { min-width: 120px; font-weight: 600; background: var(--hazard); border-color: var(--hazard); color: #18160f; border-radius: 9px 2px 9px 2px; }
 .brand { display: grid; gap: 6px; }
 .brand p { margin: 0 auto; color: var(--muted); line-height: 1.5; font-size: 0.92rem; text-align: center; }
 /* Kept on one line where there's room; it wraps only on narrow screens. */

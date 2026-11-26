@@ -59,11 +59,32 @@
   <div class="overlay" id="menu" hidden>
     <div class="frost">
       <div class="card">
-        <div class="brand">
-          <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty level below.</p>
+        <button id="settingsBtn" class="icon cog" aria-label="Settings" title="Settings" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <div class="view" id="mainView">
+          <div class="brand">
+            <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty level below.</p>
+          </div>
+          <div class="tests" id="tests"></div>
+          <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
         </div>
-        <div class="tests" id="tests"></div>
-        <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
+        <div class="view sound" id="soundView" inert>
+          <section>
+            <h2>Sound</h2>
+            <div class="mix" id="mix"></div>
+          </section>
+          <section>
+            <h2>Progress</h2>
+            <div class="erase" id="erase">
+              <span id="eraseMsg">Best times and unlocked levels in every difficulty.</span>
+              <button id="eraseBtn" class="danger">Erase progress</button>
+              <button id="eraseNo" hidden>Cancel</button>
+              <button id="eraseYes" class="danger strong" hidden>Erase</button>
+            </div>
+          </section>
+          <div class="actions"><button id="soundBack" class="primary">Back</button></div>
+        </div>
       </div>
     </div>
   </div>
