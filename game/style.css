@@ -252,3 +252,65 @@ button.danger.strong:hover { background: #dc4248; }
 .fold svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
 .hud.folded .fold svg { transform: rotate(180deg); }
 .hud.folded .plate > :not(h1, .stripe, .fold), .hud.folded .rail, .hud.folded #result { display: none !important; }
+
+/* Map editor: the game view shows the maze straight down; the bars sit above and below it, and the SVG over
+   the middle takes the clicks and draws the route. */
+.stage:has(#editor:not([hidden])) .hud { opacity: 0; visibility: hidden; transition: none; }
+.editor { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 8px 12px; pointer-events: none; }
+.editor > * { pointer-events: auto; }
+.ed-bar { justify-self: center; width: min(900px, 100%); box-sizing: border-box; }
+.ed-bar .card { width: 100%; background: rgba(18, 19, 23, 0.97); padding: 12px 16px; gap: 10px; }
+.ed-head { display: flex !important; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* Styled like the HUD plate and the results card: a sign-style heading over a hazard stripe, the game's
+   buttons with only their top-left and bottom-right corners rounded, and the Blender-rendered plates. */
+.ed-head h2 { margin: 0 6px 0 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.ed-head h2 em { font-style: normal; color: var(--hazard); }
+.ed-head .stripe { flex: 1 1 100%; }
+.ed-head select {
+  font: 600 0.85rem var(--display); letter-spacing: 0.04em; color: var(--ink); padding: 0 6px; cursor: pointer;
+  background: none; border: 8px solid transparent; border-image: url(assets/cardplate.png) 20 fill / 8px stretch;
+}
+.ed-head select:hover { filter: brightness(1.25); }
+.ed-head select:focus { outline: none; }
+.ed-head select:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+.ed-head select option { background: #1b1c22; color: var(--ink); }
+.ed-bar button { font-family: var(--display); font-weight: 600; letter-spacing: 0.04em; border-radius: 9px 2px 9px 2px; }
+.ed-info { margin-left: auto; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.ed-info.bad { color: #ff8a8d; }
+/* Same width as the bars above and below, so the four parts make one rectangle. */
+.ed-mid { justify-self: center; width: min(900px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: 0; }
+/* The plan fills exactly the space left of the stats; the SVG draws the room as large as fits, at the left. */
+.ed-plan { position: relative; min-width: 0; min-height: 0; }
+.ed-grid { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; overflow: visible; }
+/* Stats in the loading screen's type: labels in hazard yellow, figures in white. */
+.ed-statbox { align-self: stretch; display: flex; }
+.ed-statbox .ed-stats { align-content: center; }
+.ed-stats {
+  margin: 0; width: 220px; box-sizing: border-box; padding: 14px 16px; background: rgba(18, 19, 23, 0.97);
+  display: grid !important; grid-template-columns: 1fr auto; gap: 7px 14px; font-family: var(--mono); font-size: 0.85rem;
+}
+.ed-stats dt { color: var(--hazard); }
+.ed-stats dd { margin: 0; color: #fff; text-align: right; font-variant-numeric: tabular-nums; }
+.ed-stats dd.bad { color: #ff8a8d; }
+.ed-stats .gap { grid-column: 1 / -1; height: 4px; }
+.ed-grid .hit { stroke: transparent; cursor: pointer; }
+.ed-grid .hit:hover { stroke: rgba(242, 183, 5, 0.6); }
+.ed-grid .cellhit { fill: transparent; cursor: pointer; }
+.ed-grid .cellhit:hover { fill: rgba(242, 183, 5, 0.25); }
+.ed-help { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.ed-actions { align-items: center; }
+.ed-msg { flex: 1 1 100%; order: 10; min-height: 1.2em; font-size: 0.8rem; color: var(--muted); }  /* its own line, always there, so the map never jumps */
+.ed-actions #edClose { margin-left: auto; }
+.ed-msg.bad { color: #ff8a8d; }
+.ed-msg.good { color: #5fd37a; }
+button:disabled { opacity: 0.4; cursor: default; }
+.menu-tools { display: flex; justify-content: center; align-items: center; gap: 8px; color: var(--muted); font-size: 0.8rem; }
+/* On the same modelled keycap as the key hints above it. */
+.menu-tools button {
+  height: 30px; padding: 0 10px; border-radius: 0; background: none;
+  border: 6px solid transparent; border-image: url(assets/keycap.png) 24 fill / 6px stretch;
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 600; line-height: 1; color: var(--ink);
+  text-shadow: 0 1px 0 #0d0a0c;
+}
+.menu-tools button:hover { background: none; filter: brightness(1.25); }
+.menu-tools button:active { filter: brightness(0.9); }

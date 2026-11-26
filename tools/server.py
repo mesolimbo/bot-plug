@@ -88,10 +88,47 @@ def serve():
     from functools import partial
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+    import json
+
+    LEVELS = os.path.join(GAME, "levels.json")
+
     class NoCache(SimpleHTTPRequestHandler):
         def end_headers(self):
             self.send_header("Cache-Control", "no-store")
             super().end_headers()
+
+        def reply(self, code, body):
+            data = json.dumps(body).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        # The map editor asks whether it can save here (only this local server answers; the itch.io build
+        # can't), then posts the whole levels file. The file is written as the editor formats it.
+        def do_GET(self):
+            if self.path == "/__dev/ping":
+                return self.reply(200, {"save": True})
+            return super().do_GET()
+
+        def do_POST(self):
+            if self.path != "/__dev/levels":
+                return self.reply(404, {"error": "not found"})
+            size = int(self.headers.get("Content-Length", 0))
+            if not 0 < size < 1_000_000:
+                return self.reply(400, {"error": "bad size"})
+            text = self.rfile.read(size).decode("utf-8")
+            try:
+                data = json.loads(text)
+                ok = isinstance(data.get("difficulties"), list) and all(isinstance(d.get("levels"), list) for d in data["difficulties"])
+            except (ValueError, AttributeError):
+                ok = False
+            if not ok:
+                return self.reply(400, {"error": "not a levels file"})
+            with open(LEVELS, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text if text.endswith("\n") else text + "\n")
+            return self.reply(200, {"saved": os.path.relpath(LEVELS, ROOT).replace(os.sep, "/")})
 
     ThreadingHTTPServer((HOST, PORT), partial(NoCache, directory=GAME)).serve_forever()
 

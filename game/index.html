@@ -69,6 +69,7 @@
           </div>
           <div class="tests" id="tests"></div>
           <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
+          <div class="menu-tools">Complete all levels to unlock <button id="editorBtn">Map editor</button></div>
         </div>
         <div class="view sound" id="soundView" inert>
           <section>
@@ -90,6 +91,41 @@
     </div>
   </div>
 
+
+  <!-- Map editor: the real maze seen straight down, between a bar of controls above and below. -->
+  <div class="editor" id="editor" hidden>
+    <div class="frost ed-bar">
+      <div class="card ed-head">
+        <h2>Map <em>editor</em></h2>
+        <select id="edDiff" aria-label="Difficulty"></select>
+        <select id="edLevel" aria-label="Level"></select>
+        <span id="edInfo" class="ed-info"></span>
+        <span class="stripe"></span>
+      </div>
+    </div>
+    <div class="ed-mid">
+      <div class="ed-plan"><svg id="edGrid" class="ed-grid" role="img" aria-label="Maze plan" preserveAspectRatio="xMinYMid meet"></svg></div>
+      <div class="frost ed-statbox">
+        <dl class="card ed-stats" id="edStats"></dl>
+      </div>
+    </div>
+    <div class="frost ed-bar">
+      <div class="card ed-foot">
+        <p class="ed-help">Click between two squares to add or remove a wall, on a square to add or remove a pit, and on the right-hand edge to move the exit.</p>
+        <div class="actions ed-actions">
+          <button id="edPlay" class="primary">Play test</button>
+          <button id="edRevert">Revert level</button>
+          <button id="edClear" class="danger">Clear map</button>
+          <button id="edExport">Export level</button>
+          <button id="edImport">Import level</button>
+          <input type="file" id="edFile" accept=".json,application/json" hidden>
+          <button id="edSave" hidden>Save to game</button>
+          <span id="edMsg" class="ed-msg" role="status"></span>
+          <button id="edClose">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="loading" id="loading">Loading…</div>
 </div>
