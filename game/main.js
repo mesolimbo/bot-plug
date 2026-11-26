@@ -32,15 +32,15 @@ const POST = 0.34;                   // square posts at wall ends and junctions,
 // maze built from a fixed seed: a full maze, then extra openings that each add a second way through,
 // 3 to 8 cells longer than the right one. That leaves islands on the route you can pass either side
 // of. The cable is just long enough for the right way plus its colour's spare; take a long way round
-// and it runs out.
+// and it runs out. pits: how many open pits the level has (wide: the chance one spans two cells).
 const TESTS = [
   // One seed per level, picked so each maze gets its full count of islands and the right way gets
   // longer level by level: about 24-46 m for Very Easy up to 37-61 m for Extra Hard.
-  { name: "Green", level: "Very Easy", hex: "#2fbf71", spare: 0.10, loops: 3, seeds: [17, 219, 151, 138, 286, 5037, 5165, 5001, 5157, 5055] },
-  { name: "Blue", level: "Easy", hex: "#3b82f6", spare: 0.08, loops: 4, seeds: [22, 1224, 1127, 1110, 1189, 7118, 7025, 7198, 7163, 7255] },
-  { name: "Yellow", level: "Medium", hex: "#f2c230", spare: 0.06, loops: 5, seeds: [8, 2202, 2211, 2151, 2108, 9171, 9295, 9119, 9002, 9299] },
-  { name: "Orange", level: "Hard", hex: "#f28b30", spare: 0.045, loops: 6, seeds: [14, 3112, 3194, 3100, 3115, 11100, 11383, 11318, 11227, 11234] },
-  { name: "Red", level: "Extra Hard", hex: "#e5484d", spare: 0.03, loops: 7, seeds: [5, 4128, 4155, 4287, 4295, 13280, 13879, 14495, 14242, 14025] },
+  { name: "Green", level: "Very Easy", hex: "#2fbf71", spare: 0.10, loops: 3, pits: 1, wide: 0, seeds: [17, 219, 151, 138, 286, 5037, 5165, 5001, 5157, 5055] },
+  { name: "Blue", level: "Easy", hex: "#3b82f6", spare: 0.08, loops: 4, pits: 2, wide: 0.3, seeds: [22, 1224, 1127, 1110, 1189, 7118, 7025, 7198, 7163, 7255] },
+  { name: "Yellow", level: "Medium", hex: "#f2c230", spare: 0.06, loops: 5, pits: 2, wide: 0.45, seeds: [8, 2202, 2211, 2151, 2108, 9171, 9295, 9119, 9002, 9299] },
+  { name: "Orange", level: "Hard", hex: "#f28b30", spare: 0.045, loops: 6, pits: 3, wide: 0.55, seeds: [14, 3112, 3194, 3100, 3115, 11100, 11383, 11318, 11227, 11234] },
+  { name: "Red", level: "Extra Hard", hex: "#e5484d", spare: 0.03, loops: 7, pits: 3, wide: 0.7, seeds: [5, 4128, 4155, 4287, 4295, 13280, 13879, 14495, 14242, 14025] },
 ];
 
 function rng(seed) {
@@ -107,13 +107,50 @@ function makeMaze(test) {
     made++;
   }
   test.made = made;
+  makePits(test, vWall, hWall, dist(0, IN_ROW), dist(COLS - 1, OUT_ROW), IN_ROW, OUT_ROW);
   test.v = []; test.h = [];
   for (let i = 0; i <= COLS; i++) for (let r = 0; r < ROWS; r++) if (vWall[i][r]) test.v.push([i, r, r]);
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) if (hWall[j][c]) test.h.push([j, c, c]);
 }
+// Pits: open floor the bot falls into. Only on cells off the right way through, so every level stays
+// solvable, and preferably next to it: in dead ends and on the longer ways round. A pit is one cell or
+// two joined by an open edge, never touching another pit. Their own random stream leaves the maze as it was.
+const PIT_INSET = 0.25, PIT_DEPTH = 1.3;
+function makePits(test, vWall, hWall, dE, dX, inRow, outRow) {
+  const rand = rng(test.seed * 7919 + 13);
+  const best = dE[COLS - 1][outRow];
+  const onRoute = (c, r) => dE[c][r] + dX[c][r] === best;
+  const open = (c, r) => [[c + 1, r, c + 1 < COLS && !vWall[c + 1][r]], [c - 1, r, c > 0 && !vWall[c][r]],
+    [c, r + 1, r + 1 < ROWS && !hWall[r + 1][c]], [c, r - 1, r > 0 && !hWall[r][c]]].filter((n) => n[2]);
+  const nearRoute = (c, r) => open(c, r).some(([x, y]) => onRoute(x, y));
+  const taken = new Set(), key = (c, r) => c * 100 + r;
+  const free = (c, r) => !onRoute(c, r) && !(c === 0 && r === inRow) && !(c === COLS - 1 && r === outRow) &&
+    [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => !taken.has(key(c + dx, r + dy)));
+  const cells = [];
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) cells.push([c, r]);
+  test.pits = [];
+  for (let g = 0; g < test.pitsCount; g++) {
+    const pool = cells.filter(([c, r]) => free(c, r));
+    const near = pool.filter(([c, r]) => nearRoute(c, r));
+    const from = near.length ? near : pool;
+    if (!from.length) break;
+    const [c, r] = from[Math.floor(rand() * from.length)];
+    const group = [[c, r]];
+    if (rand() < test.wide) {
+      const mates = open(c, r).filter(([x, y]) => free(x, y));
+      if (mates.length) group.push(mates[Math.floor(rand() * mates.length)]);
+    }
+    for (const [x, y] of group) taken.add(key(x, y));
+    const xs = group.map(([x]) => x), ys = group.map(([, y]) => y);
+    test.pits.push({
+      minX: MAZE_X0 + Math.min(...xs) * CELL + PIT_INSET, maxX: MAZE_X0 + (Math.max(...xs) + 1) * CELL - PIT_INSET,
+      minZ: MAZE_Z0 + Math.min(...ys) * CELL + PIT_INSET, maxZ: MAZE_Z0 + (Math.max(...ys) + 1) * CELL - PIT_INSET,
+    });
+  }
+}
 const LEVEL_COUNT = 10;
 const LEVELS = TESTS.map((d) => d.seeds.map((seed) => {
-  const m = { ...d, seed };
+  const m = { ...d, seed, pitsCount: d.pits };
   makeMaze(m);
   return m;
 }));
@@ -231,6 +268,81 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), toon({ map: floorTex
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+
+// --- Pits -------------------------------------------------------------------------------------
+// The floor is rebuilt with a hole for each pit (same texture mapping as the plain plane: the shape is
+// drawn in the plane's own x/y, where y = -z). Each pit is a steel-lined shaft with a grated floor and a
+// hazard-striped rim round the opening.
+let pits = [];
+const pitGroup = new THREE.Group();
+scene.add(pitGroup);
+const pitWallTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = "#2b2429"; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 64) {
+    g.fillStyle = "#1c171b"; g.fillRect(x, 0, 4, h);
+    g.fillStyle = "#3a3036"; g.fillRect(x + 4, 0, 3, h);
+  }
+  g.fillStyle = "#1c171b"; g.fillRect(0, h / 2 - 2, w, 4);
+}, [1, 1]);
+const pitFloorTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = "#17181c"; g.fillRect(0, 0, w, h);
+  g.fillStyle = "#2c2e35";
+  for (let y = 0; y < h; y += 32) for (let x = 0; x < w; x += 32) g.fillRect(x + 4, y + 4, 24, 24);
+  g.fillStyle = "#101114";
+  for (let y = 0; y < h; y += 32) for (let x = 0; x < w; x += 32) g.fillRect(x + 8, y + 8, 16, 16);
+}, [1, 1]);
+const pitBandTex = canvasTex(256, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 64));
+pitBandTex.wrapS = THREE.RepeatWrapping;
+function buildFloor(list) {
+  const shape = new THREE.Shape([new THREE.Vector2(-W / 2, -D / 2), new THREE.Vector2(W / 2, -D / 2), new THREE.Vector2(W / 2, D / 2), new THREE.Vector2(-W / 2, D / 2)]);
+  for (const p of list) {
+    shape.holes.push(new THREE.Path([new THREE.Vector2(p.minX, -p.maxZ), new THREE.Vector2(p.minX, -p.minZ), new THREE.Vector2(p.maxX, -p.minZ), new THREE.Vector2(p.maxX, -p.maxZ)]));
+  }
+  const geo = new THREE.ShapeGeometry(shape);
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / W + 0.5, pos.getY(i) / D + 0.5);
+  floor.geometry.dispose();
+  floor.geometry = geo;
+}
+function pitPanel(w, h, mat, repeat) {
+  const m = mat.clone();
+  if (m.map) { m.map = m.map.clone(); m.map.repeat.set(...repeat); m.map.needsUpdate = true; }
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), m);
+}
+const pitWallMat = toon({ map: pitWallTex }), pitFloorMat = toon({ map: pitFloorTex }), pitBandMat = toon({ map: pitBandTex });
+function buildPits(list) {
+  pits = list;
+  buildFloor(list);
+  for (const o of [...pitGroup.children]) {
+    o.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material?.map) c.material.map.dispose(); });
+    pitGroup.remove(o);
+  }
+  for (const p of list) {
+    const sx = p.maxX - p.minX, sz = p.maxZ - p.minZ, cx = (p.minX + p.maxX) / 2, cz = (p.minZ + p.maxZ) / 2;
+    const bottom = pitPanel(sx, sz, pitFloorMat, [sx * 2, sz * 2]);
+    bottom.rotation.x = -Math.PI / 2; bottom.position.set(cx, -PIT_DEPTH, cz); bottom.receiveShadow = true;
+    pitGroup.add(bottom);
+    // Four shaft walls facing in, each with a hazard band along its top.
+    for (const [len, x, z, ry] of [[sx, cx, p.minZ, 0], [sx, cx, p.maxZ, Math.PI], [sz, p.minX, cz, Math.PI / 2], [sz, p.maxX, cz, -Math.PI / 2]]) {
+      const wall = pitPanel(len, PIT_DEPTH, pitWallMat, [len / 1.0, PIT_DEPTH / 1.0]);
+      wall.position.set(x, -PIT_DEPTH / 2, z); wall.rotation.y = ry; wall.receiveShadow = true;
+      pitGroup.add(wall);
+      const band = pitPanel(len, 0.18, pitBandMat, [len / 0.6, 1]);
+      band.position.set(x, -0.09, z); band.rotation.y = ry; band.translateZ(0.004);
+      pitGroup.add(band);
+    }
+    // Rim: a hazard-striped frame on the floor round the opening, inked along both edges.
+    const RIM = 0.12;
+    for (const [len, alongZ, x, z] of [[sx + 2 * RIM, false, cx, p.minZ - RIM / 2], [sx + 2 * RIM, false, cx, p.maxZ + RIM / 2],
+      [sz, true, p.minX - RIM / 2, cz], [sz, true, p.maxX + RIM / 2, cz]]) {
+      const rim = inked(pitPanel(len, RIM, pitBandMat, [len / 0.6, 1]));
+      rim.rotation.set(-Math.PI / 2, 0, alongZ ? Math.PI / 2 : 0);
+      rim.position.set(x, 0.003, z); rim.receiveShadow = true;
+      pitGroup.add(rim);
+    }
+  }
+}
+const pitAt = (x, z, m = 0) => pits.find((p) => x > p.minX - m && x < p.maxX + m && z > p.minZ - m && z < p.maxZ + m);
 
 const wallTex = canvasTex(256, 512, (g, w, h) => {
   for (let x = 0; x < w; x += 32) {
@@ -671,7 +783,7 @@ const SEG = 0.07, ROPE_K = 0.085, ROPE_D = 0.17, BODY_R = 0.31, BEND_R = 0.16, S
 let rp = [], ropeFree = false, ropeTarget = 0, fallT = 0, cableOut = 0, winding = 0;
 const tailPins = () => [botEnd.clone().addScaledVector(botDir, 0.13), botEnd.clone().addScaledVector(botDir, 0.06)];
 
-// Keep a rope point ROPE_D from every wall, with corners rounded off, and outside the bot when close
+// Keep a rope point ROPE_D from every wall and pit opening, with corners rounded off, and outside the bot when close
 // to him along the cable. Walls are at least 0.43 m thick with that margin and points move at most
 // STEP_MAX at a time, so a point can never be pushed out through the far side.
 function pushRope(p, nearBot) {
@@ -683,7 +795,7 @@ function pushRope(p, nearBot) {
   }
   for (let pass = 0; pass < 2; pass++) {
     let moved = false;
-    for (const w of wallsNear(p.x, p.y)) {
+    for (const w of pits.length ? wallsNear(p.x, p.y).concat(pits) : wallsNear(p.x, p.y)) {
       const x0 = w.minX + ROPE_K, x1 = w.maxX - ROPE_K, z0 = w.minZ + ROPE_K, z1 = w.maxZ - ROPE_K;
       const cx = THREE.MathUtils.clamp(p.x, x0, x1), cz = THREE.MathUtils.clamp(p.y, z0, z1);
       const dx = p.x - cx, dz = p.y - cz, d2 = dx * dx + dz * dz;
@@ -1045,7 +1157,7 @@ function cableState() {
 }
 
 // --- Bot -------------------------------------------------------------------------------------
-const bot = { pos: START.clone(), heading: 0, weight: 0, speed: 0 };
+const bot = { pos: START.clone(), heading: 0, weight: 0, speed: 0, vel: new THREE.Vector3() };
 const botRoot = new THREE.Group();
 scene.add(botRoot);
 let mixer = null, walk = null, botPlug = null, wallPlug = null, model = null, bodyBone = null, meshes = [];
@@ -1103,7 +1215,7 @@ addEventListener("blur", () => keys.clear());
 // Autopilot: plan a route around the walls on a fine grid, then follow it.
 const NAV = 0.25, NX = Math.round(W / NAV), NZ = Math.round(D / NAV);
 let route = [], routeIdx = 0, lastPlan = 0;
-function planRoute(from, boxes = walls.filter((w) => w.target > 0)) {
+function planRoute(from, boxes = walls.filter((w) => w.target > 0), holes = pits) {
   const blocked = new Uint8Array(NX * NZ);
   const inflate = BOT_R + 0.18;
   const sw = boxes.concat(pillars);
@@ -1116,6 +1228,7 @@ function planRoute(from, boxes = walls.filter((w) => w.target > 0)) {
         const dx = Math.max(w.minX - x, 0, x - w.maxX), dz = Math.max(w.minZ - z, 0, z - w.maxZ);
         if (dx * dx + dz * dz < inflate * inflate) b = true;
       }
+      if (!b && holes.some((p) => x > p.minX - inflate && x < p.maxX + inflate && z > p.minZ - inflate && z < p.maxZ + inflate)) b = true;
       blocked[iz * NX + ix] = b ? 1 : 0;
     }
   }
@@ -1222,6 +1335,7 @@ function steer(dt) {
   bot.weight += (goal - bot.weight) * Math.min(1, dt * 5);
   const speed = move ? WALK_SPEED * (move > 0 ? Math.abs(move) : 0.6) * Math.sign(move) : 0;
   bot.pos.addScaledVector(fwd, speed * bot.weight * dt);
+  bot.vel.copy(fwd).multiplyScalar(speed * bot.weight);
   pushOutOfWalls(bot.pos, BOT_R);
   if (walk) {
     walk.setEffectiveWeight(bot.weight);
@@ -1231,11 +1345,13 @@ function steer(dt) {
 }
 
 function updateBot(dt) {
-  if (unplugged || game.state !== "playing") {
+  if (unplugged || fall || game.state !== "playing") {
     bot.weight += (0 - bot.weight) * Math.min(1, dt * 6);
     if (walk) walk.setEffectiveWeight(bot.weight);
   } else {
     steer(dt);
+    const hole = pitAt(bot.pos.x, bot.pos.z);
+    if (hole) startFall(hole);
   }
   botRoot.position.copy(bot.pos);
   botRoot.rotation.y = bot.heading;
@@ -1382,6 +1498,115 @@ function setPowerLook(p) {
   });
 }
 
+// --- Falling into a pit ---------------------------------------------------------------------------
+// He drops in along a gravity curve, turning over on the way down into one of FALL_POSES picked at random,
+// thuds onto the bottom and settles. The plug pops out as he tips in, which ends the turn.
+// A pose: pitch (tipping back, +, or forward, -), roll (onto his left side, +), yaw, and per leg [swing
+// (knee forward/up), knee (bend, negative), ankle, splay (outward)], left leg first.
+const FALL_POSES = [
+  { name: "on his back", pitch: 1.35, roll: 0.15, yaw: 0.3, legs: [[1.1, -0.5, 0.4, 0.2], [0.8, -0.9, 0.3, 0.35]] },
+  { name: "face down", pitch: -1.3, roll: -0.1, yaw: -0.2, legs: [[-0.6, -0.4, -0.3, 0.15], [-0.3, -1.1, -0.2, 0.3]] },
+  { name: "on his left side", pitch: 0.2, roll: 1.4, yaw: 0.6, legs: [[0.5, -1.2, 0.4, 0.1], [1.0, -0.4, 0.2, -0.2]] },
+  { name: "on his right side", pitch: -0.15, roll: -1.4, yaw: -0.5, legs: [[0.9, -0.3, 0.3, -0.2], [0.3, -1.4, 0.5, 0.1]] },
+  { name: "sitting", pitch: 0.55, roll: 0.05, yaw: 0, legs: [[1.4, -0.15, 0.6, 0.35], [1.3, -0.3, 0.5, 0.4]] },
+  { name: "on his head", pitch: 2.55, roll: 0.25, yaw: 0.8, legs: [[0.4, -0.2, 0.2, 0.7], [-0.3, -0.6, 0.1, 0.6]] },
+  { name: "slumped on his knees", pitch: -0.55, roll: 0.1, yaw: -0.4, legs: [[1.0, -2.1, 0.7, 0.15], [0.9, -2.0, 0.6, 0.2]] },
+  { name: "doing the splits", pitch: 0.3, roll: 0.25, yaw: 1.2, legs: [[1.3, -0.1, 0.4, 0.1], [-0.8, -0.2, -0.3, 0.1]] },
+  { name: "tangled up", pitch: 0.95, roll: 0.6, yaw: -0.9, legs: [[0.7, -1.6, 0.5, -0.45], [1.2, -0.7, 0.3, -0.5]] },
+  { name: "flat like a frog", pitch: -0.35, roll: -0.05, yaw: 0.5, legs: [[0.6, -1.5, 0.6, 0.75], [0.6, -1.5, 0.6, 0.75]] },
+];
+const FALL_TIME = 0.5, SETTLE_TIME = 0.22, BODY_UP = 0.58; // BODY_UP: his body's centre above his feet
+let fall = null; // { pit, pose, from, to, q0, q1, t, done, focus }
+let footBox = null; // a foot's block in its bone's frame: { center, quat, half }
+function measureFoot() {
+  model.updateMatrixWorld(true);
+  const foot = legs[0][2], rootQ = botRoot.getWorldQuaternion(new THREE.Quaternion());
+  footBox = {
+    center: foot.worldToLocal(botRoot.localToWorld(new THREE.Vector3(0.0185, 0.076, -0.1035))),
+    quat: foot.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rootQ),
+    half: new THREE.Vector3(0.136, 0.074, 0.065),
+  };
+}
+// Bend the legs into the pose, e of the way from standing; the body's tumble is the root's rotation.
+function poseLegs(pose, e) {
+  const side = new THREE.Vector3(0, 0, 1).applyQuaternion(botRoot.quaternion);
+  const ahead = new THREE.Vector3(1, 0, 0).applyQuaternion(botRoot.quaternion);
+  legs.forEach(([thigh, shin, foot], i) => {
+    const [swing, knee, ankle, splay] = pose.legs[i];
+    turnBone(thigh, ahead, (i === 0 ? 1 : -1) * splay * e);
+    turnBone(thigh, side, swing * e);
+    turnBone(shin, side, knee * e);
+    turnBone(foot, side, ankle * e);
+  });
+}
+const _corner = new THREE.Vector3(), _boxQ = new THREE.Matrix4();
+// The lowest point of him as posed now: the bottom of his round body, or a corner of a foot.
+function lowestPoint(center) {
+  model.updateMatrixWorld(true);
+  let low = center.y - 0.27;
+  for (const [, , foot] of legs) {
+    _boxQ.compose(footBox.center, footBox.quat, _one).premultiply(foot.matrixWorld);
+    for (let k = 0; k < 8; k++) {
+      _corner.set(k & 1 ? footBox.half.x : -footBox.half.x, k & 2 ? footBox.half.y : -footBox.half.y, k & 4 ? footBox.half.z : -footBox.half.z).applyMatrix4(_boxQ);
+      low = Math.min(low, _corner.y);
+    }
+  }
+  return low;
+}
+// Put him with his body's centre at c and turned by q, the legs e of the way into the pose.
+function placeFall(c, q, e) {
+  restorePose();
+  botRoot.quaternion.copy(q);
+  botRoot.position.copy(c).sub(_v.set(0, BODY_UP, 0).applyQuaternion(q));
+  botRoot.updateMatrixWorld(true);
+  poseLegs(fall.pose, e);
+}
+function startFall(pit) {
+  game.fell = true;
+  keys.clear();
+  const pose = FALL_POSES[Math.floor(Math.random() * FALL_POSES.length)];
+  const heading = new THREE.Quaternion().setFromAxisAngle(_up, bot.heading);
+  const q1 = heading.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.roll, pose.yaw, pose.pitch, "YXZ")));
+  // He lands a little way into the pit along his way in, kept clear of the shaft's walls.
+  const m = 0.5, fwd = bot.vel.lengthSq() > 1e-4 ? bot.vel.clone().setY(0).normalize() : new THREE.Vector3(Math.cos(bot.heading), 0, -Math.sin(bot.heading));
+  const lx = THREE.MathUtils.clamp(bot.pos.x + fwd.x * 0.55, Math.min(pit.minX + m, (pit.minX + pit.maxX) / 2), Math.max(pit.maxX - m, (pit.minX + pit.maxX) / 2));
+  const lz = THREE.MathUtils.clamp(bot.pos.z + fwd.z * 0.55, Math.min(pit.minZ + m, (pit.minZ + pit.maxZ) / 2), Math.max(pit.maxZ - m, (pit.minZ + pit.maxZ) / 2));
+  fall = { pit, pose, q0: heading, q1, t: 0, done: false, from: new THREE.Vector3(bot.pos.x, BODY_UP, bot.pos.z), to: new THREE.Vector3(lx, 0, lz), focus: new THREE.Vector3() };
+  // Rest height: pose him fully at the bottom, then lift him so his lowest point touches the floor.
+  placeFall(fall.to.setY(0), q1, 1);
+  fall.to.y = -PIT_DEPTH - lowestPoint(fall.to);
+  placeFall(fall.from, fall.q0, 0);
+  fall.focus.copy(fall.from);
+  sfx("pit_fall");
+  unplug();
+}
+const _fallQ = new THREE.Quaternion(), _fallC = new THREE.Vector3();
+function stepFall(dt) {
+  if (fall.done) { placeFall(fall.focus, fall.q1, 1); return; }
+  fall.t += dt;
+  const u = Math.min(1, fall.t / FALL_TIME);
+  // Across steadily, down under gravity; he turns over and his legs go as he drops.
+  _fallC.lerpVectors(fall.from, fall.to, u);
+  _fallC.y = fall.from.y + (fall.to.y - fall.from.y) * u * u;
+  const turn = THREE.MathUtils.smootherstep(u, 0, 1);
+  _fallQ.slerpQuaternions(fall.q0, fall.q1, turn);
+  let e = turn;
+  if (fall.t > FALL_TIME) {
+    // The thud: he squashes down a couple of centimetres and the limbs fling a little past the pose.
+    const s = Math.min(1, (fall.t - FALL_TIME) / SETTLE_TIME), k = Math.sin(Math.PI * s) * (1 - s);
+    _fallC.y -= 0.035 * Math.sin(Math.PI * s);
+    e = 1 + 0.18 * k;
+    if (s >= 1) { fall.done = true; e = 1; _fallC.copy(fall.to); }
+  }
+  placeFall(_fallC, _fallQ, e);
+  fall.focus.copy(_fallC);
+}
+function endFall() {
+  fall = null;
+  game.fell = false;
+  botRoot.quaternion.identity();
+}
+
 // --- Load and assemble ----------------------------------------------------------------------
 const [botGltf, plugGltf, outletGltf, signGltf] = await Promise.all(["bot", "plug", "outlet", "sign"].map((n) => loader.loadAsync(`assets/${n}.glb`)));
 model = botGltf.scene;
@@ -1446,6 +1671,9 @@ for (const side of ["L", "R"]) {
 }
 model.updateMatrixWorld(true);
 footRestY = legs[0][2].getWorldPosition(new THREE.Vector3()).y - botRoot.position.y;
+measureFoot();
+// A fall carries him well below his resting bounds, so never cull him by them.
+meshes.forEach((o) => { o.frustumCulled = false; });
 // The sign and the outlet: lettered faces and lights glow (unlit); the rest takes the toon shading.
 function addPainted(root, pos) {
   root.traverse((o) => {
@@ -1481,7 +1709,7 @@ function layCable() {
 }
 
 // --- Game state -------------------------------------------------------------------------------
-const game = { test: null, level: 0, run: 0, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false, cheer: 0 };
+const game = { test: null, level: 0, run: 0, state: "menu", time: 0, started: null, peak: 0, lifted: 0, over: 0, autopilot: false, cheer: 0, fell: false };
 // Best times by "difficulty.level". Times saved before levels existed count as level 1.
 let best = {};
 try { best = JSON.parse(localStorage.getItem("abp-best") || "{}"); } catch { best = {}; }
@@ -1509,7 +1737,9 @@ function startTest(k, l, withIntro = false) {
   $("testName").textContent = `${t.level} ${l + 1}/${LEVEL_COUNT}`;
   updateLevelButtons();
   $("pullLim").textContent = `${Math.round(t.spare * 1000) / 10}%`;
+  if (fall) endFall();
   if (unplugged) replug();
+  buildPits(t.pits);
   power = 1;
   bot.pos.copy(START); bot.heading = 0; bot.weight = 0;
   botRoot.position.copy(bot.pos); botRoot.rotation.y = 0;
@@ -1554,7 +1784,7 @@ function finish(passed) {
   clearTimeout(resultTimer);
   resultTimer = setTimeout(() => {
     const v = $("verdict");
-    v.textContent = passed ? "PASS" : "UNPLUGGED";
+    v.textContent = passed ? "PASS" : game.fell ? "FELL IN" : "UNPLUGGED";
     v.className = "verdict " + (passed ? "pass" : "fail");
     if (!passed) sfx("fail");
     $("actions").innerHTML = acts.join("");
@@ -1691,7 +1921,7 @@ const SFX = {
   step_a: { gain: 0.55, len: 0.14 }, step_b: { gain: 0.45, len: 0.14 }, // he takes about 12 steps a second
   walls_rise: { gain: 1.6 }, power_up: { gain: 0.6 }, unplug: { gain: 1.8, offset: 0.24 },
   power_down: { gain: 2.2 }, pass: { gain: 0.7 }, fail: { gain: 0.6 }, stomp: { gain: 0.5 },
-  cable_strain: { gain: 2.5 }, click: { gain: 0.35 },
+  cable_strain: { gain: 2.5 }, click: { gain: 0.35 }, pit_fall: { gain: 1.0 },
 };
 const BGM_LEVEL = 0.4; // the tracks are mastered loud; keep them under the effects
 // One track per difficulty, from mellow to dark, with a trim that evens out their loudness. tail: seconds
@@ -1856,6 +2086,16 @@ const cheering = () => game.state === "passed" && !camIntro;
 const mourning = () => game.state === "failed" && !camIntro;
 const ORBIT_SPEED = 0.6, ORBIT_DIST = 1.7, ORBIT_UP = 1.55;
 function camGoal() {
+  if (fall && !camIntro) {
+    // Circle high over the pit, looking steeply down at him where he landed, clear of the walls round it.
+    const fx = Math.cos(camYaw), fz = -Math.sin(camYaw), c = fall.pit;
+    const cx = (c.minX + c.maxX) / 2, cz = (c.minZ + c.maxZ) / 2;
+    camGoalPos.set(cx - fx * 1.0, 3.6, cz - fz * 1.0);
+    camGoalPos.x = THREE.MathUtils.clamp(camGoalPos.x, -ROOM.x + 0.3, ROOM.x - 0.3);
+    camGoalPos.z = THREE.MathUtils.clamp(camGoalPos.z, -ROOM.z + 0.3, ROOM.z - 0.3);
+    camGoalLook.copy(fall.focus);
+    return;
+  }
   if (mourning()) {
     const fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
     camGoalPos.set(bot.pos.x - fx * ORBIT_DIST, ORBIT_UP, bot.pos.z - fz * ORBIT_DIST);
@@ -1945,19 +2185,21 @@ function fadeBlockers() {
   if (on) {
     // Only sight lines to the bot himself (feet, middle, head, and both sides of his body): walls ahead
     // of him never fade.
-    const vx = bot.pos.x - camera.position.x, vz = bot.pos.z - camera.position.z, vl = Math.hypot(vx, vz) || 1;
+    // Fallen into a pit, he lies where the ragdoll left him.
+    const at = fall ? fall.focus : bot.pos, y0 = fall ? fall.focus.y - 0.4 : 0;
+    const vx = at.x - camera.position.x, vz = at.z - camera.position.z, vl = Math.hypot(vx, vz) || 1;
     const sx = (-vz / vl) * 0.25, sz = (vx / vl) * 0.25;
-    _sight[0].set(bot.pos.x, 0.08, bot.pos.z);
-    _sight[1].set(bot.pos.x, 0.5, bot.pos.z);
-    _sight[2].set(bot.pos.x, 0.95, bot.pos.z);
-    _sight[3].set(bot.pos.x + sx, 0.5, bot.pos.z + sz);
-    _sight[4].set(bot.pos.x - sx, 0.5, bot.pos.z - sz);
+    _sight[0].set(at.x, y0 + 0.08, at.z);
+    _sight[1].set(at.x, y0 + 0.5, at.z);
+    _sight[2].set(at.x, y0 + 0.95, at.z);
+    _sight[3].set(at.x + sx, y0 + 0.5, at.z + sz);
+    _sight[4].set(at.x - sx, y0 + 0.5, at.z - sz);
     // Only walls that block the view fade, and a post never fades without a panel. A blocking panel takes
     // the posts at its two ends with it. A post that blocks on its own takes the one panel meeting it
     // that lies nearest the camera-to-bot line (and that panel's other end post).
     const group = new Set();
     const addPanel = (pnl) => { group.add(pnl); for (const l of pnl.links || []) group.add(l); };
-    const cx = camera.position.x, cz = camera.position.z, dx = bot.pos.x - cx, dz = bot.pos.z - cz;
+    const cx = camera.position.x, cz = camera.position.z, dx = at.x - cx, dz = at.z - cz;
     const dd = dx * dx + dz * dz || 1;
     const offLine = (w) => {
       const px = (w.minX + w.maxX) / 2, pz = (w.minZ + w.maxZ) / 2;
@@ -2055,7 +2297,7 @@ resize();
 // measures your walk, plus the colour's spare.
 for (const t of LEVELS.flat()) {
   const boxes = wallBoxes(t);
-  const r = planRoute(START, boxes);
+  const r = planRoute(START, boxes, t.pits);
   const line = new Taut(socketFoot(), new THREE.Vector2(START.x, START.z), wallCorners(boxes));
   for (const p of r.points.slice(1)) line.moveTo(p);
   t.route = line.length() + cableDrops();
@@ -2066,6 +2308,7 @@ for (const t of LEVELS.flat()) {
 rope = makeRope(LEVELS[0][0].len);
 buildCableMeshes();
 buildWalls(LEVELS[0][0]);
+buildPits(LEVELS[0][0].pits);
 for (const w of walls) { w.rise = 1; w.mesh.position.y = w.h / 2; }
 layCable();
 camIntro = { t: 0, run: null, hold: true }; // the first menu sits over the sign
@@ -2098,12 +2341,15 @@ renderer.setAnimationLoop(() => {
     updateWalls(dt);
     setWallList(solidWalls());
     updateBot(dt);
-    restorePose();
-    mixer.update(dt);
-    updateStepSounds();
-    savePose();
     power = unplugged ? Math.max(0, power - dt / 1.2) : Math.min(1, power + dt / 0.8);
-    applySlump(1 - power);
+    if (fall) stepFall(dt);
+    else {
+      restorePose();
+      mixer.update(dt);
+      updateStepSounds();
+      savePose();
+      applySlump(1 - power);
+    }
     if (game.state === "passed") applyStomp(game.time - game.cheer);
     updateStompSounds();
     setPowerLook(power);
