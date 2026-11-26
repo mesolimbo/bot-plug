@@ -1,4 +1,4 @@
-/* Layout: one-screen game. The test floor fills the screen; a status plate sits top-left,
+/* Layout: one-screen game. The test floor fills the screen; a status plate sits bottom-left,
    a control rail docks at the bottom, and the menu and results cards float over the floor. */
 :root {
   color-scheme: dark;
@@ -38,11 +38,13 @@ body {
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-/* Top-left column: status plate, then the control bar. */
+/* Bottom-left column: status plate, then the control bar. */
 /* The HUD column sits in a modelled steel frame (rendered in Blender to match the sign), one image per
    state; inside it, a dark blurred backing fills the gaps between the panels. */
+/* Anchored to the bottom-left corner, so the column grows upward as the results card or the folded
+   state changes its height. */
 .hud {
-  position: absolute; top: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 6px;
+  position: absolute; bottom: 4px; left: 4px; width: var(--hud-w); box-sizing: content-box; padding: 6px;
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
   border: 14px solid transparent; border-image: url(assets/frame-bar.png) 28 / 14px stretch;
   isolation: isolate;
