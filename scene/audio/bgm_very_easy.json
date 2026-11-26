@@ -1,0 +1,103 @@
+{
+  "song_id": "qK4bJiDje0gseYAlBrBP",
+  "composition_plan": {
+    "chunks": [
+      {
+        "text": "[Loop A]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "88 BPM",
+          "relaxed lo-fi groove",
+          "soft music box melody",
+          "celesta counterline",
+          "warm felt piano chords",
+          "gentle round sub bass",
+          "brushed light percussion",
+          "tiny metallic ticks like a slow clock",
+          "distant conveyor hum",
+          "sealed loop point with no lift",
+          "close, cozy mix"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop B]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "88 BPM",
+          "restful lo-fi variation",
+          "music box motif with a new turn",
+          "celesta answering phrase",
+          "felt piano chord changes",
+          "round sub bass support",
+          "light brushed percussion accents",
+          "tiny metallic ticks",
+          "soft conveyor hum bed",
+          "playful maze-walk motion",
+          "soft tape-worn texture"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop A2]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "88 BPM",
+          "relaxed lo-fi groove",
+          "soft music box melody",
+          "celesta counterline",
+          "warm felt piano chords",
+          "gentle round sub bass",
+          "brushed light percussion",
+          "tiny metallic ticks like a slow clock",
+          "distant conveyor hum",
+          "steady circular phrasing",
+          "close, cozy mix"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop B2]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "88 BPM",
+          "restful lo-fi variation",
+          "music box motif with a new turn",
+          "celesta answering phrase",
+          "felt piano chord changes",
+          "round sub bass support",
+          "light brushed percussion accents",
+          "tiny metallic ticks",
+          "soft conveyor hum bed",
+          "playful maze-walk motion",
+          "seamless return to the opening phrase"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      }
+    ]
+  },
+  "song_metadata": {
+    "title": "Toy Factory Loop",
+    "description": "A cozy instrumental loop with music box and celesta, warm felt piano, and gentle lo-fi motion for a cute robot wandering an easy toy factory maze. It stays calm, sweet, and seamless, designed to wrap back to the start without a break.",
+    "genres": [
+      "ambient",
+      "lo-fi"
+    ],
+    "languages": [],
+    "is_explicit": false
+  },
+  "words_timestamps": null,
+  "waveform_visual": null
+}

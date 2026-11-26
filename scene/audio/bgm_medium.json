@@ -1,0 +1,111 @@
+{
+  "song_id": "yVfcbGHsnhzl9bTVk1jm",
+  "composition_plan": {
+    "chunks": [
+      {
+        "text": "[Loop A]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "112 BPM",
+          "tight toy-factory groove",
+          "plucky marimba and xylophone motif",
+          "muted funky electric bass",
+          "light syncopated percussion",
+          "metallic wrench and pipe hits",
+          "whistling synth lead",
+          "cheerful brass stabs",
+          "curious mischievous mood",
+          "loop-friendly arrangement",
+          "bright dry mix"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop B]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "112 BPM",
+          "bouncy conveyor-belt groove",
+          "marimba ostinato with xylophone accents",
+          "muted electric bass riff",
+          "clanky metal percussion accents",
+          "whistling synth lead variation",
+          "short brass punctuation",
+          "playful call-and-response phrasing",
+          "steady mid-tempo motion",
+          "wide stereo sparkle",
+          "clean mechanical texture"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop C]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "112 BPM",
+          "quirky factory-floor groove",
+          "plucky mallet melody with small syncopations",
+          "muted funky bassline",
+          "industrial percussion taps and clanks",
+          "whistling synth melody lift",
+          "cheerful brass stabs and replies",
+          "lighthearted mechanical energy",
+          "mid-register harmony support",
+          "crisp transient detail",
+          "seamless loop continuity"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop D]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "112 BPM",
+          "animated toy-workshop groove",
+          "marimba and xylophone hooks",
+          "muted electric bass with bounce",
+          "metallic tool-like percussion hits",
+          "whistling synth lead restatement",
+          "brass stabs on phrase ends",
+          "mischievous playful character",
+          "stable energy throughout",
+          "loop-ready ending phrase",
+          "bright polished mix"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      }
+    ]
+  },
+  "song_metadata": {
+    "title": "Assembly Line Fizz",
+    "description": "A playful, looping instrumental built for a cartoon robot factory test game, with marimba, xylophone, muted bass, metallic percussion, whistling lead, and cheerful brass accents. The groove stays lively and seamless from start to finish for uninterrupted gameplay.",
+    "genres": [
+      "electronic",
+      "funk"
+    ],
+    "languages": [],
+    "is_explicit": false
+  },
+  "words_timestamps": null,
+  "waveform_visual": null
+}

@@ -1,0 +1,108 @@
+{
+  "song_id": "O4asrUGrNwGP6H8fbFyL",
+  "composition_plan": {
+    "chunks": [
+      {
+        "text": "[Loop A]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "120 BPM",
+          "driving mechanical groove",
+          "clanking metal percussion pattern",
+          "anvil hits on offbeats",
+          "hissing steam bursts as rhythm",
+          "ratcheting gears as rhythm",
+          "chunky analog synth bass",
+          "bright chiptune square-wave lead",
+          "toy glockenspiel accents",
+          "cute tense arcade energy",
+          "tight machine-room mix"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop B]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "120 BPM",
+          "driving mechanical groove variation",
+          "metallic percussion counter-rhythm",
+          "anvil hits and gear clicks in syncopation",
+          "steam burst accents",
+          "chunky analog synth bass variation",
+          "bright chiptune square-wave lead answer phrases",
+          "toy glockenspiel accents",
+          "playful tension and momentum",
+          "clean loopable arrangement"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop C]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "120 BPM",
+          "driving mechanical groove",
+          "ratcheting gears in denser pattern",
+          "clanking metal percussion fills",
+          "anvil hits reinforcing downbeats",
+          "steam bursts for transition points",
+          "chunky analog synth bass",
+          "bright chiptune square-wave lead",
+          "toy glockenspiel sparkle",
+          "determined arcade chase feel",
+          "wide stereo mechanical texture"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop D]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "120 BPM",
+          "driving mechanical groove",
+          "metal percussion motif resolved for reset",
+          "anvil hits and gear clatter closing the phrase",
+          "hissing steam bursts",
+          "chunky analog synth bass",
+          "bright chiptune square-wave lead",
+          "toy glockenspiel accents",
+          "cute hard-level finish",
+          "seamless restart into Loop A"
+        ],
+        "negative_styles": [
+          "drums"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      }
+    ]
+  },
+  "song_metadata": {
+    "title": "Factory Maze Dash",
+    "description": "A cute but tense industrial game loop built from metallic percussion, steam bursts, gears, and bright chip lead over a chunky synth bass. Designed to cycle seamlessly for a fast cartoon robot chase through a factory maze.",
+    "genres": [
+      "electronic"
+    ],
+    "languages": [],
+    "is_explicit": false
+  },
+  "words_timestamps": null,
+  "waveform_visual": null
+}

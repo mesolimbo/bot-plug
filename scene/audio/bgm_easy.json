@@ -1,0 +1,107 @@
+{
+  "song_id": "N7ZIaMjSOrK1B5mMydr9",
+  "composition_plan": {
+    "chunks": [
+      {
+        "text": "[Loop A]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "100 BPM",
+          "easygoing bounce groove",
+          "ukulele and kalimba lead motif",
+          "soft vibraphone chord bed",
+          "round plucky bass",
+          "light shaker and wood block percussion",
+          "small friendly metal clinks",
+          "bright toy factory maze atmosphere",
+          "sunny curious mood",
+          "clean loopable arrangement",
+          "gentle stereo sparkle",
+          "no drums"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop B]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "100 BPM",
+          "slightly varied bounce groove",
+          "ukulele answered by kalimba phrases",
+          "soft vibraphone harmony lift",
+          "round plucky bass with subtle syncopation",
+          "light shaker and wood block percussion",
+          "small friendly metal clinks",
+          "playful maze-turn variation",
+          "bright mechanical toy texture",
+          "steady energy",
+          "clean loopable arrangement",
+          "no drums"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop C]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "100 BPM",
+          "easygoing bounce groove",
+          "ukulele melody with higher register turns",
+          "kalimba sparkle accents",
+          "soft vibraphone chord pads",
+          "round plucky bass",
+          "light shaker and wood block percussion",
+          "small friendly metal clinks",
+          "curious wandering feel",
+          "bright polished toy-factory sound",
+          "wide but gentle mix",
+          "no drums"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Loop D]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "100 BPM",
+          "easygoing bounce groove",
+          "ukulele and kalimba motif returning to the home phrase",
+          "soft vibraphone chords",
+          "round plucky bass",
+          "light shaker and wood block percussion",
+          "small friendly metal clinks",
+          "seamless return point",
+          "sunny lightly cheerful mood",
+          "steady energy",
+          "loop-ready ending that reconnects to the start",
+          "no drums"
+        ],
+        "negative_styles": [],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      }
+    ]
+  },
+  "song_metadata": {
+    "title": "Toy Factory Tumble",
+    "description": "A gentle, playful instrumental loop for a cute cartoon robot exploring a bright toy factory maze, with ukulele, kalimba, vibraphone, plucky bass, and tiny mechanical accents. Designed as a seamless endless loop with steady energy and a clean reconnecting ending.",
+    "genres": [
+      "ambient",
+      "electronic"
+    ],
+    "languages": [],
+    "is_explicit": false
+  },
+  "words_timestamps": null,
+  "waveform_visual": null
+}

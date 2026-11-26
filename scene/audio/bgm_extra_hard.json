@@ -1,0 +1,185 @@
+{
+  "song_id": "OKDME0Migwb7QsywRCLu",
+  "composition_plan": {
+    "chunks": [
+      {
+        "text": "[Intro]",
+        "duration_ms": 12000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "dark dystopian factory synthpop",
+          "clean polished modern production",
+          "crisp punchy drum machine",
+          "tight clean analog synth bass",
+          "cold shimmering synth pads",
+          "distant factory siren swell",
+          "hydraulic hiss accents",
+          "cute toy glockenspiel motif introduced",
+          "cinematic but charming",
+          "wide clear stereo mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "noise",
+          "harpsichord",
+          "pipe organ",
+          "waltz",
+          "choir",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Verse]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "driving clean groove",
+          "punchy kick and tight snare",
+          "rolling arpeggiated synth bass",
+          "metallic clank percussion as fills",
+          "melancholic square-wave lead melody",
+          "subtle glockenspiel answers",
+          "clean polished mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Chorus]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "big memorable hook",
+          "soaring bright synth lead melody doubled by glockenspiel",
+          "full warm pads",
+          "energetic drums with open hats",
+          "heroic but bleak factory mood",
+          "clean powerful mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Verse 2]",
+        "duration_ms": 20000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "verse groove with new countermelody",
+          "plucked synth arpeggios",
+          "piston and anvil rhythmic accents",
+          "square-wave lead variation",
+          "clean polished mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Bridge]",
+        "duration_ms": 20000,
+        "positive_styles": [
+          "116 BPM",
+          "relative major lift",
+          "drums half-time",
+          "dreamy cold pads and music-of-machines texture",
+          "gentle glockenspiel and bell melody",
+          "hopeful moment in the dark factory",
+          "building tension with risers",
+          "clean mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Final Chorus]",
+        "duration_ms": 24000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "biggest version of the chorus hook",
+          "lead melody with harmony line",
+          "full drums and driving bass",
+          "glockenspiel sparkle",
+          "triumphant dark synthpop energy",
+          "clean powerful mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "muddy mix",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      },
+      {
+        "text": "[Outro]",
+        "duration_ms": 12000,
+        "positive_styles": [
+          "116 BPM",
+          "minor key",
+          "groove thins back to intro texture",
+          "synth bass and glockenspiel motif",
+          "distant siren",
+          "ends on the intro's opening bar so it loops back seamlessly",
+          "clean mix"
+        ],
+        "negative_styles": [
+          "distortion",
+          "lo-fi",
+          "fade to silence",
+          "vocals"
+        ],
+        "context_adherence": "high",
+        "conditioning_ref": null,
+        "condition_strength": null
+      }
+    ]
+  },
+  "song_metadata": {
+    "title": null,
+    "description": null,
+    "genres": [],
+    "languages": [],
+    "is_explicit": null
+  },
+  "words_timestamps": null,
+  "waveform_visual": null
+}

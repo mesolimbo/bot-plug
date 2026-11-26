@@ -1292,6 +1292,7 @@ function unplug() {
   scene.add(botPlug);
   botPlug.scale.set(1, 1, 1);
   burst(botEnd.clone().addScaledVector(botDir, -PLUG_LEN), botDir);
+  sfx("unplug"); sfx("power_down", { delay: 0.2 });
   finish(false);
 }
 function replug() {
@@ -1382,7 +1383,7 @@ function setPowerLook(p) {
 }
 
 // --- Load and assemble ----------------------------------------------------------------------
-const [botGltf, plugGltf, socketGltf, signGltf] = await Promise.all(["bot", "plug", "wall_socket", "sign"].map((n) => loader.loadAsync(`assets/${n}.glb`)));
+const [botGltf, plugGltf, outletGltf, signGltf] = await Promise.all(["bot", "plug", "outlet", "sign"].map((n) => loader.loadAsync(`assets/${n}.glb`)));
 model = botGltf.scene;
 model.position.y = 0.5;
 botRoot.add(model);
@@ -1445,10 +1446,9 @@ for (const side of ["L", "R"]) {
 }
 model.updateMatrixWorld(true);
 footRestY = legs[0][2].getWorldPosition(new THREE.Vector3()).y - botRoot.position.y;
-// Sign: the lettered face and the light bars glow (unlit); the housing takes the toon shading.
-{
-  const sign = signGltf.scene;
-  sign.traverse((o) => {
+// The sign and the outlet: lettered faces and lights glow (unlit); the rest takes the toon shading.
+function addPainted(root, pos) {
+  root.traverse((o) => {
     if (!o.isMesh) return;
     const m = o.material, name = m.name || "";
     o.material = /face|light/.test(name)
@@ -1456,13 +1456,12 @@ footRestY = legs[0][2].getWorldPosition(new THREE.Vector3()).y - botRoot.positio
       : toon({ map: m.map || null, color: m.map ? 0xffffff : m.color });
     o.add(new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), inkLine));
   });
-  sign.position.copy(SIGN_AT);
-  scene.add(sign);
+  root.position.copy(pos);
+  scene.add(root);
 }
-const socket = socketGltf.scene;
-toonify(socket);
-socket.position.copy(SOCKET_POS);
-scene.add(socket);
+addPainted(signGltf.scene, SIGN_AT);
+addPainted(outletGltf.scene, SOCKET_POS);
+outletGltf.scene.rotation.y = Math.PI / 2; // modelled facing +z; the socket wall faces +x
 wallPlug = plugTemplate.clone();
 wallPlug.position.set(-ROOM.x + 0.062, SOCKET_POS.y, 0);
 scene.add(wallPlug);
@@ -1523,10 +1522,13 @@ function startTest(k, l, withIntro = false) {
   layCable();
   needed = 0;
   route = []; routeIdx = 0;
+  sfx("walls_rise");
+  playMusic(k);
   if (!withIntro) setTimeout(() => { if (game.run === run && game.state === "rising") beginPlay(); }, 1300);
 }
 function beginPlay() {
   game.state = "playing";
+  sfx("power_up");
   if (!manual) { const r = planRoute(bot.pos); route = r.points; routeIdx = 1; }
 }
 
@@ -1534,6 +1536,7 @@ function finish(passed) {
   if (game.state !== "playing") return;
   game.state = passed ? "passed" : "failed";
   game.cheer = game.time + 0.4; // he settles for a moment, then stomps for joy
+  if (passed) sfx("pass");
   const k = game.test, l = game.level, key = `${k}.${l}`;
   const time = game.started === null ? 0 : game.time - game.started;
   if (passed && !game.autopilot && (!best[key] || time < best[key])) {
@@ -1553,6 +1556,7 @@ function finish(passed) {
     const v = $("verdict");
     v.textContent = passed ? "PASS" : "UNPLUGGED";
     v.className = "verdict " + (passed ? "pass" : "fail");
+    if (!passed) sfx("fail");
     $("actions").innerHTML = acts.join("");
     // The results are worth seeing: open the HUD if it was folded away. This doesn't change the saved
     // choice, so it folds again on the next level.
@@ -1615,7 +1619,7 @@ $("menuBtn").onclick = showMenu;
 // Sound settings: a volume and mute per channel, remembered between visits. Audio code reads
 // soundGain("bgm") or soundGain("fx") and can listen with onSoundChange(fn).
 const SOUND_CHANNELS = { bgm: "BGM", fx: "FX" };
-const sound = { bgm: { vol: 0.7, muted: false }, fx: { vol: 0.8, muted: false } };
+const sound = { bgm: { vol: 0.3, muted: false }, fx: { vol: 0.25, muted: false } };
 try { Object.entries(JSON.parse(localStorage.getItem("abp-sound") || "{}")).forEach(([k, v]) => sound[k] && Object.assign(sound[k], v)); } catch { /* storage unavailable */ }
 const soundListeners = new Set();
 const soundGain = (k) => (sound[k].muted ? 0 : sound[k].vol);
@@ -1678,6 +1682,133 @@ function showSound(on) {
 }
 $("settingsBtn").onclick = () => showSound($("soundView").inert);
 $("soundBack").onclick = () => { showSound(false); $("settingsBtn").focus(); };
+
+// --- Audio -----------------------------------------------------------------------------------------
+// Browsers only start audio after a click or key press, so the context and the music wait for one.
+// Each effect has a level that evens out the generated files, an optional start offset that skips a
+// silent lead-in, and an optional length after which it fades out.
+const SFX = {
+  step_a: { gain: 0.55, len: 0.14 }, step_b: { gain: 0.45, len: 0.14 }, // he takes about 12 steps a second
+  walls_rise: { gain: 1.6 }, power_up: { gain: 0.6 }, unplug: { gain: 1.8, offset: 0.24 },
+  power_down: { gain: 2.2 }, pass: { gain: 0.7 }, fail: { gain: 0.6 }, stomp: { gain: 0.5 },
+  cable_strain: { gain: 2.5 }, click: { gain: 0.35 },
+};
+const BGM_LEVEL = 0.4; // the tracks are mastered loud; keep them under the effects
+// One track per difficulty, from mellow to dark, with a trim that evens out their loudness. tail: seconds
+// of near-silence at the end to skip when looping.
+const BGM = [
+  { name: "bgm_very_easy", gain: 1.32 }, { name: "bgm_easy", gain: 1.16 }, { name: "bgm_medium", gain: 0.89 },
+  { name: "bgm_hard", gain: 1.01 }, { name: "bgm_extra_hard", gain: 0.71, tail: 1 },
+];
+const audio = { ctx: null, bufs: {}, pending: {}, bgm: null, fx: null, music: null, strain: null };
+// The files download with the page; they're decoded once the context exists.
+const audioFiles = Object.fromEntries([...Object.keys(SFX), ...BGM.map((t) => t.name)].map((name) =>
+  [name, fetch(`assets/audio/${name}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)]));
+function decodeAudio(name) {
+  const ctx = audio.ctx;
+  return (audio.pending[name] ??= audioFiles[name].then((b) => b && ctx.decodeAudioData(b.slice(0)))
+    .then((buf) => { if (buf) audio.bufs[name] = buf; return buf; }).catch(() => null));
+}
+function initAudio() {
+  if (audio.ctx) { if (audio.ctx.state === "suspended" && !document.hidden) audio.ctx.resume(); return; }
+  const ctx = audio.ctx = new AudioContext();
+  audio.bgm = ctx.createGain(); audio.fx = ctx.createGain();
+  audio.bgm.connect(ctx.destination); audio.fx.connect(ctx.destination);
+  applySoundLevels();
+  Object.keys(SFX).forEach(decodeAudio);
+  playMusic(game.test ?? 0);
+}
+// Crossfade to difficulty k's track. A decoded track takes about 37 MB, so only the playing one is kept.
+function playMusic(k) {
+  const track = BGM[k];
+  if (!audio.ctx || audio.music?.name === track.name) return;
+  const ctx = audio.ctx, old = audio.music;
+  const cur = audio.music = { name: track.name, src: null, gain: ctx.createGain() };
+  cur.gain.gain.value = 0; cur.gain.connect(audio.bgm);
+  if (old) {
+    old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+    old.src?.stop(ctx.currentTime + 2);
+    setTimeout(() => {
+      old.gain.disconnect();
+      if (audio.music.name !== old.name) { delete audio.bufs[old.name]; delete audio.pending[old.name]; }
+    }, 2100);
+  }
+  decodeAudio(track.name).then((buf) => {
+    if (audio.music !== cur) {
+      if (audio.music.name !== cur.name) { delete audio.bufs[cur.name]; delete audio.pending[cur.name]; }
+      return;
+    }
+    if (!buf) return;
+    const src = cur.src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true; src.loopEnd = buf.duration - (track.tail ?? 0);
+    src.connect(cur.gain); src.start();
+    cur.gain.gain.setTargetAtTime(track.gain, ctx.currentTime, 0.4);
+  });
+}
+function applySoundLevels() {
+  if (!audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  audio.bgm.gain.setTargetAtTime(soundGain("bgm") * BGM_LEVEL, t, 0.05);
+  audio.fx.gain.setTargetAtTime(soundGain("fx"), t, 0.05);
+}
+onSoundChange(applySoundLevels);
+addEventListener("pointerdown", initAudio, true);
+addEventListener("keydown", initAudio, true);
+document.addEventListener("visibilitychange", () => {
+  if (!audio.ctx) return;
+  if (document.hidden) audio.ctx.suspend(); else audio.ctx.resume();
+});
+// Play an effect once: vol scales its level, rate its pitch, delay is in seconds. One asked for while
+// its file is still decoding (on the first click) plays when ready, unless that's too late to match.
+function sfx(name, opts = {}) {
+  if (!audio.ctx) return;
+  if (!audio.bufs[name]) {
+    const asked = performance.now();
+    audio.pending[name]?.then((buf) => { if (buf && performance.now() - asked < 300) sfx(name, opts); });
+    return;
+  }
+  const { vol = 1, rate = 1, delay = 0 } = opts, buf = audio.bufs[name];
+  if (audio.ctx.state !== "running") return;
+  const src = audio.ctx.createBufferSource(), g = audio.ctx.createGain();
+  src.buffer = buf; src.playbackRate.value = rate;
+  g.gain.value = SFX[name].gain * vol;
+  src.connect(g).connect(audio.fx);
+  const at = audio.ctx.currentTime + delay, len = SFX[name].len;
+  src.start(at, SFX[name].offset || 0);
+  if (len) { g.gain.setTargetAtTime(0, at + len, 0.015); src.stop(at + len + 0.1); }
+}
+// The cable's strain loop fades in as the cable nears the end of its slack.
+function setStrain(level) {
+  if (!audio.ctx || audio.ctx.state !== "running") return;
+  if (!audio.strain) {
+    const buf = audio.bufs.cable_strain;
+    if (!buf || level <= 0) return;
+    const src = audio.ctx.createBufferSource(), g = audio.ctx.createGain();
+    src.buffer = buf; src.loop = true; g.gain.value = 0;
+    src.connect(g).connect(audio.fx); src.start();
+    audio.strain = g;
+  }
+  audio.strain.gain.setTargetAtTime(SFX.cable_strain.gain * level, audio.ctx.currentTime, 0.08);
+}
+// Footsteps follow the walk clip: the feet touch down at 0 and halfway through the cycle, so a foot
+// lands whenever the clip moves into the other half, walking forward or back.
+let stepHalf = 0, stompCount = 0;
+function updateStepSounds() {
+  if (!walk) return;
+  const half = Math.floor((((walk.time / walk.getClip().duration) % 1) + 1) % 1 * 2);
+  if (half === stepHalf) return;
+  stepHalf = half;
+  if (bot.weight < 0.25 || game.state !== "playing" || unplugged) return;
+  sfx(half ? "step_b" : "step_a", { vol: bot.weight * (0.85 + Math.random() * 0.3), rate: 0.92 + Math.random() * 0.16 });
+}
+// One stomp sound each time a foot lands in the victory dance (see applyStomp), for the first few.
+function updateStompSounds() {
+  if (game.state !== "passed") { stompCount = 0; return; }
+  const n = Math.floor((game.time - game.cheer) * 1.3 * 2);
+  if (n > stompCount) { stompCount = n; sfx("stomp", { rate: 0.95 + Math.random() * 0.1 }); }
+}
+// Menu, control bar and result buttons click.
+document.addEventListener("click", (e) => { if (e.target.closest("button")) sfx("click"); });
 // Fold the HUD down to its title bar; remembered between visits.
 function setFolded(on) {
   document.querySelector(".hud").classList.toggle("folded", on);
@@ -1953,10 +2084,12 @@ renderer.setAnimationLoop(() => {
     updateBot(dt);
     restorePose();
     mixer.update(dt);
+    updateStepSounds();
     savePose();
     power = unplugged ? Math.max(0, power - dt / 1.2) : Math.min(1, power + dt / 0.8);
     applySlump(1 - power);
     if (game.state === "passed") applyStomp(game.time - game.cheer);
+    updateStompSounds();
     setPowerLook(power);
     updatePins();
     if (!unplugged && game.state !== "menu") {
@@ -1972,6 +2105,7 @@ renderer.setAnimationLoop(() => {
       if (game.over > 0.2) unplug();
       else if (bot.pos.x > GOAL_X) finish(true);
     }
+    setStrain(game.state === "playing" && !unplugged ? THREE.MathUtils.smoothstep(state.tension, 0.8, 1) : 0);
   }
   buildFrames();
   cable.update(frames);
