@@ -1204,6 +1204,13 @@ addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); toggleMenu(); return; }
+  // In the menu, 1-5 start that difficulty, as if its button were clicked.
+  const digit = /^(Digit|Numpad)([1-5])$/.exec(e.code);
+  if (digit && !$("menu").hidden && $("soundView").inert) {
+    e.preventDefault();
+    $("tests").querySelector(`.test[data-k="${digit[2] - 1}"]`)?.click();
+    return;
+  }
   const k = KEYMAP[e.code];
   if (!k || !$("menu").hidden) return;
   e.preventDefault();
