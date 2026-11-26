@@ -265,9 +265,11 @@ scene.add(ceiling);
 const steel = toon({ color: 0x3a2e34 });
 const steelLight = toon({ color: 0x655259 });
 const wrapMat = toon({ map: canvasTex(64, 64, (g, w, h) => stripes(g, w, h, "#f2b705", "#1b1b1d", 32), [2, 2]) });
+const pillars = []; // the building's columns stand out from the side walls, so the bot collides with them
 for (let x = -8; x <= 8; x += 4) {
   for (const z of [-ROOM.z + 0.08, ROOM.z - 0.08]) {
     scene.add(inked(new THREE.Mesh(new THREE.BoxGeometry(0.5, ROOM.h, 0.16), steel)).translateX(x).translateY(ROOM.h / 2).translateZ(z));
+    pillars.push({ minX: x - 0.25, maxX: x + 0.25, minZ: z - 0.08, maxZ: z + 0.08 });
   }
 }
 const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff1d6 });
@@ -1053,7 +1055,8 @@ const botEnd = new THREE.Vector3(), botDir = new THREE.Vector3();
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 function pushOutOfWalls(p, r) {
-  for (const w of solidWalls()) {
+  const solids = solidWalls().concat(pillars);
+  for (const w of solids) {
     const cx = THREE.MathUtils.clamp(p.x, w.minX, w.maxX), cz = THREE.MathUtils.clamp(p.z, w.minZ, w.maxZ);
     const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
     if (d2 >= r * r) continue;
@@ -1068,7 +1071,7 @@ function pushOutOfWalls(p, r) {
   }
   // The plug sticks out behind him; keep it 10 cm off the walls too, by moving him.
   const bx = p.x - Math.cos(bot.heading) * 0.45, bz = p.z + Math.sin(bot.heading) * 0.45;
-  for (const w of solidWalls()) {
+  for (const w of solids) {
     const cx = THREE.MathUtils.clamp(bx, w.minX, w.maxX), cz = THREE.MathUtils.clamp(bz, w.minZ, w.maxZ);
     const dx = bx - cx, dz = bz - cz, d = Math.hypot(dx, dz), need = 0.1;
     if (d >= need) continue;
@@ -1103,7 +1106,7 @@ let route = [], routeIdx = 0, lastPlan = 0;
 function planRoute(from, boxes = walls.filter((w) => w.target > 0)) {
   const blocked = new Uint8Array(NX * NZ);
   const inflate = BOT_R + 0.18;
-  const sw = boxes;
+  const sw = boxes.concat(pillars);
   for (let iz = 0; iz < NZ; iz++) {
     for (let ix = 0; ix < NX; ix++) {
       const x = -ROOM.x + (ix + 0.5) * NAV, z = -ROOM.z + (iz + 0.5) * NAV;
