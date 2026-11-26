@@ -174,7 +174,7 @@ button.danger.strong:hover { background: #dc4248; }
 .sound .actions { justify-content: center; }
 .sound .actions button { min-width: 120px; font-weight: 600; background: var(--hazard); border-color: var(--hazard); color: #18160f; border-radius: 9px 2px 9px 2px; }
 .brand { display: grid; gap: 6px; }
-.brand p { margin: 0 auto; color: var(--muted); line-height: 1.5; font-size: 0.92rem; text-align: center; }
+.brand p { margin: 0 auto; color: var(--hazard); line-height: 1.5; font-size: 1.02rem; text-align: center; }
 /* Kept on one line where there's room; it wraps only on narrow screens. */
 .brand .line { white-space: nowrap; }
 @media (max-width: 640px) { .brand .line { white-space: normal; } }
@@ -215,8 +215,12 @@ button.danger.strong:hover { background: #dc4248; }
 .stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .actions .primary { background: var(--hazard); border-color: var(--hazard); color: #18160f; font-weight: 600; }
-.loading { position: absolute; inset: 0; display: grid; place-items: center;
-  font-family: var(--mono); font-size: 0.85rem; color: var(--muted); pointer-events: none; }
+.loading { position: absolute; inset: 0; display: grid; place-items: end; padding: 0 clamp(16px, 5vw, 64px) 6vh;
+  background: linear-gradient(transparent 70%, rgb(10 11 14 / 0.85)), url("assets/loading.jpg") center / cover no-repeat, #15171c;
+  font-family: var(--mono); font-size: 1.3rem; color: var(--hazard); text-align: right; pointer-events: none; }
+.loading.ready span { animation: prompt 1.6s ease-in-out infinite; }
+@keyframes prompt { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .loading.ready span { animation: none; } }
 @media (max-width: 560px) {
   .plate { padding: 9px 11px; }
 }

@@ -6,6 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
+<link rel="preload" href="assets/loading.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -64,7 +65,7 @@
         </button>
         <div class="view" id="mainView">
           <div class="brand">
-            <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty level below.</p>
+            <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty of your shift below:</p>
           </div>
           <div class="tests" id="tests"></div>
           <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
@@ -90,7 +91,7 @@
   </div>
 
 
-  <div class="loading" id="loading">Powering up the test floor…</div>
+  <div class="loading" id="loading">Loading…</div>
 </div>
 
 <script type="importmap">

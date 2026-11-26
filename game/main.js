@@ -1523,7 +1523,7 @@ function startTest(k, l, withIntro = false) {
   needed = 0;
   route = []; routeIdx = 0;
   sfx("walls_rise");
-  playMusic(k);
+  updateMusic();
   if (!withIntro) setTimeout(() => { if (game.run === run && game.state === "rising") beginPlay(); }, 1300);
 }
 function beginPlay() {
@@ -1598,7 +1598,7 @@ $("tests").addEventListener("click", (e) => {
   const k = e.target.closest(".test")?.dataset.k;
   if (k !== undefined) startTest(Number(k), firstOpen(Number(k)), true);
 });
-function showMenu() { renderMenu(); showSound(false); $("result").hidden = true; $("menu").hidden = false; fitMenu(); }
+function showMenu() { renderMenu(); showSound(false); $("result").hidden = true; $("menu").hidden = false; fitMenu(); updateMusic(); }
 // Shrink the whole menu to fit the space under the sign rather than letting it scroll.
 function fitMenu() {
   const menu = $("menu"), frost = menu.querySelector(".frost");
@@ -1611,7 +1611,7 @@ function fitMenu() {
 addEventListener("resize", fitMenu);
 function toggleMenu() {
   if (!$("menu").hidden && !$("soundView").inert) { showSound(false); return; }
-  if (!$("menu").hidden && game.test !== null) { $("menu").hidden = true; return; }
+  if (!$("menu").hidden && game.test !== null) { $("menu").hidden = true; updateMusic(); return; }
   showMenu();
 }
 $("menuBtn").onclick = showMenu;
@@ -1700,9 +1700,10 @@ const BGM = [
   { name: "bgm_very_easy", gain: 1.32 }, { name: "bgm_easy", gain: 1.16 }, { name: "bgm_medium", gain: 0.89 },
   { name: "bgm_hard", gain: 1.01 }, { name: "bgm_extra_hard", gain: 0.71, tail: 1 },
 ];
+const TITLE_BGM = { name: "bgm_title", gain: 0.85, tail: 3 }; // while the menu is open; a little under the level tracks
 const audio = { ctx: null, bufs: {}, pending: {}, bgm: null, fx: null, music: null, strain: null };
 // The files download with the page; they're decoded once the context exists.
-const audioFiles = Object.fromEntries([...Object.keys(SFX), ...BGM.map((t) => t.name)].map((name) =>
+const audioFiles = Object.fromEntries([...Object.keys(SFX), ...[...BGM, TITLE_BGM].map((t) => t.name)].map((name) =>
   [name, fetch(`assets/audio/${name}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)]));
 function decodeAudio(name) {
   const ctx = audio.ctx;
@@ -1716,11 +1717,12 @@ function initAudio() {
   audio.bgm.connect(ctx.destination); audio.fx.connect(ctx.destination);
   applySoundLevels();
   Object.keys(SFX).forEach(decodeAudio);
-  playMusic(game.test ?? 0);
+  updateMusic();
 }
-// Crossfade to difficulty k's track. A decoded track takes about 37 MB, so only the playing one is kept.
-function playMusic(k) {
-  const track = BGM[k];
+// The title track while the menu is open, otherwise the current difficulty's.
+function updateMusic() { playMusic($("menu").hidden ? BGM[game.test ?? 0] : TITLE_BGM); }
+// Crossfade to a track. A decoded track takes about 37 MB, so only the playing one is kept.
+function playMusic(track) {
   if (!audio.ctx || audio.music?.name === track.name) return;
   const ctx = audio.ctx, old = audio.music;
   const cur = audio.music = { name: track.name, src: null, gain: ctx.createGain() };
@@ -2066,10 +2068,24 @@ buildCableMeshes();
 buildWalls(LEVELS[0][0]);
 for (const w of walls) { w.rise = 1; w.mesh.position.y = w.h / 2; }
 layCable();
-$("loading").remove();
 camIntro = { t: 0, run: null, hold: true }; // the first menu sits over the sign
 updateCamera(0, true);
-showMenu();
+// Loaded: wait for Space (or a click or tap) before the title menu. That press also starts the audio.
+{
+  const loading = $("loading");
+  loading.innerHTML = "<span>Press Space to start your shift.</span>";
+  loading.classList.add("ready");
+  const start = (e) => {
+    if (e.type === "keydown" && e.code !== "Space") return;
+    e.preventDefault();
+    removeEventListener("keydown", start, true);
+    removeEventListener("pointerdown", start, true);
+    loading.remove();
+    showMenu();
+  };
+  addEventListener("keydown", start, true);
+  addEventListener("pointerdown", start, true);
+}
 
 // --- Loop --------------------------------------------------------------------------------------
 const clock = new THREE.Clock();
