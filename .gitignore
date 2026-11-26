@@ -2,3 +2,5 @@
 .server.log
 .playwright-mcp/
 *.blend1
+*.blend[0-9]
+scene/bot_backups/*.blend

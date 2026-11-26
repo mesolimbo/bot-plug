@@ -207,7 +207,7 @@ button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { #result .verdict { animation: none; } }
 #result .stats { font-size: 0.78rem; gap: 3px 12px; }
 #result .actions .primary { flex: 1 1 100%; }
-#result .actions button { flex: 1 1 auto; }
+#result .actions button { flex: 1 1 auto; border-radius: 9px 2px 9px 2px; }  /* round top-left and bottom-right only */
 .plate, .rail, #result .card { background: rgba(18, 19, 23, 0.96); }
 /* Fold button in the plate's corner: collapses the HUD to just the title and stripe. */
 .fold {

@@ -525,6 +525,7 @@ const outlineMat = new THREE.ShaderMaterial({
     #include <common>
     #include <skinning_pars_vertex>
     uniform float thickness;
+    attribute float outlineScale; // 0 inside the socket, where the shell would poke into the pin holes
     void main() {
       #include <skinbase_vertex>
       #include <begin_vertex>
@@ -532,7 +533,7 @@ const outlineMat = new THREE.ShaderMaterial({
       #include <skinnormal_vertex>
       #include <skinning_vertex>
       vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
-      mv.xyz += normalize(normalMatrix * objectNormal) * thickness;
+      mv.xyz += normalize(normalMatrix * objectNormal) * thickness * outlineScale;
       gl_Position = projectionMatrix * mv;
     }`,
   fragmentShader: `
@@ -1369,7 +1370,9 @@ function applySlump(s) {
 function setPowerLook(p) {
   const c = 0.45 + 0.55 * p;
   meshes.forEach((m) => {
-    m.material.color.setRGB(c, c, c);
+    if (m.userData.glow) return;
+    const t = m.userData.tint;
+    m.material.color.setRGB(c * (t ? t.r : 1), c * (t ? t.g : 1), c * (t ? t.b : 1));
     const want = p < 0.55 ? m.userData.offMap : m.userData.onMap;
     if (want && m.material.map !== want) m.material.map = want;
   });
@@ -1381,10 +1384,26 @@ model = botGltf.scene;
 model.position.y = 0.5;
 botRoot.add(model);
 model.traverse((o) => { if (o.isMesh) meshes.push(o); });
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
 meshes.forEach((o) => {
-  o.material = new THREE.MeshBasicMaterial({ map: o.material.map || null });
+  const { name, map } = o.material;
+  if (map) map.anisotropy = maxAniso;
+  if (name === "bot_glow") { // the socket's pin holes: always lit, never dimmed with the rest of him
+    o.material = new THREE.MeshBasicMaterial({ color: 0xff7a14 });
+    o.userData.glow = true;
+    return;
+  }
+  if (name.includes("decal")) { // full-resolution logos laid over the paint, without an outline
+    o.material = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    o.userData.decal = true;
+    o.userData.tint = new THREE.Color(0.81, 0.79, 0.85); // the chevron's yellow under the baked shading
+    return;
+  }
+  o.material = new THREE.MeshBasicMaterial({ map: map || null });
   o.castShadow = true;
-  const ol = o.isSkinnedMesh ? new THREE.SkinnedMesh(o.geometry, outlineMat) : new THREE.Mesh(o.geometry, outlineMat);
+  const g = o.geometry;
+  g.setAttribute("outlineScale", g.getAttribute("_outline") || new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1), 1));
+  const ol = o.isSkinnedMesh ? new THREE.SkinnedMesh(g, outlineMat) : new THREE.Mesh(g, outlineMat);
   if (o.isSkinnedMesh) ol.bind(o.skeleton, o.bindMatrix);
   ol.frustumCulled = false;
   o.add(ol);
@@ -1392,7 +1411,7 @@ meshes.forEach((o) => {
 const offMap = await new THREE.TextureLoader().loadAsync("assets/bot_off.jpg");
 meshes.forEach((o) => {
   const on = o.material.map;
-  if (!on) return;
+  if (!on || o.userData.decal) return;
   offMap.flipY = on.flipY; offMap.colorSpace = on.colorSpace;
   offMap.wrapS = on.wrapS; offMap.wrapT = on.wrapT; offMap.anisotropy = on.anisotropy;
   o.userData.onMap = on; o.userData.offMap = offMap;
