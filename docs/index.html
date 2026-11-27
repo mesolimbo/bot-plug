@@ -65,7 +65,7 @@
         </button>
         <div class="view" id="mainView">
           <div class="brand">
-            <p><span class="line">Navigate the maze without disconnecting the power cable from the bot plug.</span><br>Select the difficulty of your shift below:</p>
+            <p><span class="line">Navigate the maze without disconnecting the power cable plug from the bot.</span><br>Select the difficulty of your shift below:</p>
           </div>
           <div class="tests" id="tests"></div>
           <div class="keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to walk · <kbd>Esc</kbd> menu</div>
@@ -121,6 +121,9 @@
           <input type="file" id="edFile" accept=".json,application/json" hidden>
           <button id="edRandom" class="icon" title="Random maze" aria-label="Random maze">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle class="dot" cx="8.5" cy="8.5" r="1.4"/><circle class="dot" cx="15.5" cy="8.5" r="1.4"/><circle class="dot" cx="12" cy="12" r="1.4"/><circle class="dot" cx="8.5" cy="15.5" r="1.4"/><circle class="dot" cx="15.5" cy="15.5" r="1.4"/></svg>
+          </button>
+          <button id="edUndo" class="icon" title="Undo (Ctrl+Z)" aria-label="Undo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
           </button>
           <button id="edSave" class="icon" title="Save to game" aria-label="Save to game" hidden>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="5"/></svg>

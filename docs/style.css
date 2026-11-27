@@ -117,7 +117,11 @@ button {
 }
 button:hover { background: #35323b; }
 button[aria-pressed="true"] { background: var(--hazard); border-color: var(--hazard); color: #18160f; }
-button:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+/* No focus rings anywhere, whether clicked, pressed or reached with the keyboard: a control with keyboard
+   focus brightens instead, as on hover. */
+button, select, input, a, [tabindex] { outline: none; -webkit-tap-highlight-color: transparent; }
+:is(button, select, input, a, [tabindex]):focus, :is(button, select, input, a, [tabindex]):focus-visible { outline: none; }
+:is(button, select, a):focus-visible { filter: brightness(1.25); }
 
 /* Menu and results cards */
 .overlay {
@@ -170,8 +174,7 @@ button.danger.strong:hover { background: #dc4248; }
 .mix output { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 .mix button.icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mix input[type="range"] { width: 100%; accent-color: var(--hazard); }
-.mix input[type="range"]:focus { outline: none; }
-.mix input[type="range"]:focus-visible { outline: 2px solid var(--hazard); outline-offset: 4px; border-radius: 4px; }
+.mix input[type="range"]:focus-visible { filter: brightness(1.25); }
 .mix .muted input[type="range"], .mix .muted output { opacity: 0.4; }
 .sound .actions { justify-content: center; }
 .sound .actions button { min-width: 120px; font-weight: 600; background: var(--hazard); border-color: var(--hazard); color: #18160f; border-radius: 9px 2px 9px 2px; }
@@ -271,14 +274,10 @@ button.danger.strong:hover { background: #dc4248; }
   background: none; border: 8px solid transparent; border-image: url(assets/cardplate.png) 20 fill / 8px stretch;
 }
 .ed-head select:hover { filter: brightness(1.25); }
-/* No ring, even while the list is open (browsers count a clicked dropdown as keyboard focus); the
-   plate brightens instead, as on hover. */
-.ed-head select:focus, .ed-head select:focus-visible { outline: none; }
-.ed-head select:focus-visible { filter: brightness(1.25); }
 .ed-head select option { background: #1b1c22; color: var(--ink); }
 .ed-bar button { font-family: var(--display); font-weight: 600; letter-spacing: 0.04em; border-radius: 9px 2px 9px 2px; }
 .ed-info { margin-left: auto; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
-.ed-info.bad { color: #ff8a8d; }
+.ed-info.bad, .ed-info .edited { color: #ff8a8d; }
 /* Same width as the bars above and below, so the four parts make one rectangle. */
 .ed-mid { justify-self: center; width: min(900px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; min-height: 0; }
 /* The plan fills exactly the space left of the stats; the SVG draws the room as large as fits, at the left. */

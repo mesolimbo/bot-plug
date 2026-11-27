@@ -1273,6 +1273,7 @@ const KEYMAP = { KeyW: "fwd", ArrowUp: "fwd", KeyS: "back", ArrowDown: "back", K
 };
 addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, textarea") && !(e.code === "Escape" && e.target.type === "range")) return;
+  if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ" && !e.shiftKey && !$("editor").hidden) { e.preventDefault(); edUndoStep(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); if (!$("editor").hidden) closeEditor(); else toggleMenu(); return; }
@@ -2027,9 +2028,24 @@ const edBase = () => levelData.difficulties[ed.k].levels[ed.l];
 const edLevel = () => LEVELS[ed.k][ed.l];
 const edDirty = (k, l) => LEVELS[k][l].map.join("\n") !== levelData.difficulties[k].levels[l].join("\n");
 const anyDirty = () => LEVELS.some((ls, k) => ls.some((_, l) => edDirty(k, l)));
-function edSetMap(map) {
+// Every change to a level can be undone, one step at a time, for as long as the page is open.
+const edUndo = new Map(); // "k.l" -> earlier maps, newest last
+const edHistory = () => edUndo.get(`${ed.k}.${ed.l}`) || [];
+function edSetMap(map, undoing = false) {
+  if (!undoing) {
+    const key = `${ed.k}.${ed.l}`, past = edUndo.get(key) || [];
+    past.push(edLevel().map);
+    if (past.length > 200) past.shift();
+    edUndo.set(key, past);
+  }
   LEVELS[ed.k][ed.l] = measureLevel(makeLevel(ed.k, map));
   edShow(false);
+}
+function edUndoStep() {
+  const past = edHistory();
+  if (!past.length) return;
+  edSetMap(past.pop(), true);
+  edMsg("");
 }
 // Lay the level out on the test floor: walls rise or sink to match, the pits open, the bot waits at the start.
 function edShow(fresh) {
@@ -2129,7 +2145,8 @@ function edRender() {
   el.innerHTML = svg.join("");
   const ok = Number.isFinite(t.len);
   edStats(t);
-  $("edInfo").textContent = ok ? `Right way ${t.route.toFixed(1)} m · cable ${t.len} m${edDirty(ed.k, ed.l) ? " · edited" : ""}` : "No way through: open a wall";
+  $("edInfo").innerHTML = ok ? `Right way ${t.route.toFixed(1)} m · cable ${t.len} m${edDirty(ed.k, ed.l) ? ' · <span class="edited">edited</span>' : ""}` : "No way through: open a wall";
+  $("edUndo").disabled = !edHistory().length;
   $("edInfo").classList.toggle("bad", !ok);
   $("edPlay").disabled = !ok;
   $("edRevert").disabled = !edDirty(ed.k, ed.l);
@@ -2283,6 +2300,7 @@ function randomMap(k) {
   }
   return map;
 }
+$("edUndo").onclick = edUndoStep;
 $("edRandom").onclick = () => { edSetMap(randomMap(ed.k)); edMsg(`A new random ${TESTS[ed.k].level} maze. Revert level brings the saved one back.`); };
 // Clear: no walls inside and no pits; the room's walls, the entrance and the exit stay.
 $("edClear").onclick = () => {
