@@ -810,8 +810,9 @@ const tailPins = () => [botEnd.clone().addScaledVector(botDir, 0.13), botEnd.clo
 // Keep a rope point ROPE_D from every wall and pit opening, with corners rounded off, and outside the bot when close
 // to him along the cable. Walls are at least 0.43 m thick with that margin and points move at most
 // STEP_MAX at a time, so a point can never be pushed out through the far side.
-// The rope keeps PIT_ROPE_GAP clear of a hole and rounds its corners to PIT_ROPE_R, so it sweeps round
-// them in a wide curve. A hole is made of several rectangles; only their outer sides are pulled in to round
+// The cable lies across holes like any floor, sagging into the gap (see cablePoints). Only the loose end
+// after an unplug keeps PIT_ROPE_GAP clear of them, its corners rounded to PIT_ROPE_R, so the plug comes to
+// rest on the rim rather than in mid-air over the pit. A hole is made of several rectangles; only their outer sides are pulled in to round
 // them, so the rope runs straight past the joins between them.
 const PIT_ROPE_R = 0.45, PIT_ROPE_GAP = 0.1;
 let pitCores = [];
@@ -845,7 +846,7 @@ function pushRope(p, nearBot) {
   for (let pass = 0; pass < 2; pass++) {
     let moved = false;
     const near = wallsNear(p.x, p.y).map(wallCore);
-    for (const c of pitCores) if (p.x > c.x0 - c.d && p.x < c.x1 + c.d && p.y > c.z0 - c.d && p.y < c.z1 + c.d) near.push(c);
+    if (ropeFree) for (const c of pitCores) if (p.x > c.x0 - c.d && p.x < c.x1 + c.d && p.y > c.z0 - c.d && p.y < c.z1 + c.d) near.push(c);
     for (const { x0, x1, z0, z1, d: R } of near) {
       const cx = THREE.MathUtils.clamp(p.x, x0, x1), cz = THREE.MathUtils.clamp(p.y, z0, z1);
       const dx = p.x - cx, dz = p.y - cz, d2 = dx * dx + dz * dz;
@@ -996,6 +997,26 @@ function hangLanding() {
   const a = new THREE.Vector3(fx, 0.3, fz), b = new THREE.Vector3(rp[j].x, 0.3, rp[j].y);
   return wallList.some((w) => segmentHitsBox(a, b, w)) ? -1 : j;
 }
+// Cable lying across a hole spans it from rim to rim and sags into the gap: a hanging curve whose depth
+// grows with the span and with the slack left, never reaching the pit's floor.
+function sagOverHoles(sm, h, arc) {
+  if (!pits.length) return;
+  const slack = THREE.MathUtils.clamp(1 - needed / rope.len, 0, 1);
+  const over = (i) => h[i] <= CABLE_R + 0.01 && pitAt(sm[i].x, sm[i].z);
+  for (let i = 0; i < sm.length; i++) {
+    if (!over(i)) continue;
+    let j = i;
+    while (j + 1 < sm.length && over(j + 1)) j++;
+    const a = Math.max(0, i - 1), b = Math.min(sm.length - 1, j + 1);
+    const span = Math.abs(arc[a] - arc[b]);
+    const depth = Math.min(PIT_DEPTH * 0.6, span * (0.08 + 0.22 * slack));
+    for (let k = i; k <= j; k++) {
+      const t = (arc[a] - arc[k]) / Math.max(1e-6, arc[a] - arc[b]);
+      sm[k].y = CABLE_R - depth * Math.sin(Math.PI * THREE.MathUtils.clamp(t, 0, 1));
+    }
+    i = j;
+  }
+}
 function cablePoints() {
   const out = [wallEnd.clone()], m = rp.length;
   const arc = new Float32Array(m), fromHead = new Float32Array(m);
@@ -1041,6 +1062,7 @@ function cablePoints() {
     for (let i = 2; i < m - 2; i++) next[i].lerp(sm[i - 1].clone().add(sm[i + 1]).multiplyScalar(0.5), 0.5);
     sm = next;
   }
+  sagOverHoles(sm, h, arc);
   if (landing >= 0) {
     // From the landing point, carrying on the floor rope's direction, up to the plug along its axis.
     const P0 = sm[landing], back = Math.max(0, landing - 3);
@@ -2022,6 +2044,14 @@ function edShow(fresh) {
   // He waits across from the entrance, wherever it has been moved to.
   bot.pos.copy(startOf(t)); botRoot.position.copy(bot.pos);
   buildWalls(t);
+  // A newly picked level appears as it is; only edits to the open level rise and sink.
+  if (fresh) {
+    for (let k = walls.length - 1; k >= 0; k--) {
+      const w = walls[k];
+      if (w.target < 0) { scene.remove(w.mesh); walls.splice(k, 1); continue; }
+      w.rise = 1; w.mesh.position.y = w.h / 2;
+    }
+  }
   buildPits(t.pits);
   rope = makeRope(Number.isFinite(t.len) ? t.len : 30);
   buildCableMeshes();
@@ -2109,16 +2139,29 @@ function edStats(t) {
   let walls = 0, pitCells = 0, open = 0, deadEnds = 0;
   for (let i = 1; i < COLS; i++) for (let r = 0; r < ROWS; r++) if (map[2 * r + 1][2 * i] === "|") walls++; else open++;
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) if (map[2 * j][2 * c + 1] === "-") walls++; else open++;
+  // Open sides of each square (the room's edges count as walls, the entrance and exit as openings).
+  const ways = (c, r) => [[c - 1, r, map[2 * r + 1][2 * c] !== "|"], [c + 1, r, map[2 * r + 1][2 * c + 2] !== "|"],
+    [c, r - 1, map[2 * r][2 * c + 1] !== "-"], [c, r + 1, map[2 * r + 2][2 * c + 1] !== "-"]].filter((w) => w[2]);
   for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
     if (map[2 * r + 1][2 * c + 1] === "O") pitCells++;
-    const ways = [map[2 * r + 1][2 * c] !== "|", map[2 * r + 1][2 * c + 2] !== "|", map[2 * r][2 * c + 1] !== "-", map[2 * r + 2][2 * c + 1] !== "-"]
-      .filter(Boolean).length;
-    if (ways === 1) deadEnds++;
+    if (ways(c, r).length === 1) deadEnds++;
   }
-  // Each opening beyond what joins every square once adds a loop: a second way round.
-  const loops = Math.max(0, open - (COLS * ROWS - 1));
+  // Junctions: squares on the right way (fewest squares from entrance to exit, round the pits) where a
+  // third or fourth opening offers a wrong turn. Each one is a choice the player has to get right.
+  let junctions = 0;
+  if (t.entry >= 0 && t.exit >= 0) {
+    const key = (c, r) => c * 100 + r, from = new Map([[key(0, t.entry), -1]]), q = [[0, t.entry]];
+    const inside = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && map[2 * r + 1][2 * c + 1] !== "O";
+    while (q.length && !from.has(key(COLS - 1, t.exit))) {
+      const [c, r] = q.shift();
+      for (const [x, y] of ways(c, r)) if (inside(x, y) && !from.has(key(x, y))) { from.set(key(x, y), key(c, r)); q.push([x, y]); }
+    }
+    for (let k = from.has(key(COLS - 1, t.exit)) ? key(COLS - 1, t.exit) : -1; k >= 0; k = from.get(k)) {
+      if (ways(Math.floor(k / 100), k % 100).length >= 3) junctions++;
+    }
+  }
   const rows = [
-    ["Walls", walls], ["Openings", open], ["Loops", loops], ["Dead ends", deadEnds],
+    ["Walls", walls], ["Openings", open], ["Junctions", junctions], ["Dead ends", deadEnds],
     null,
     ["Pits", t.pits.length], ["Pit squares", pitCells],
     null,
