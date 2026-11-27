@@ -1311,7 +1311,28 @@ addEventListener("keydown", (e) => {
   keys.add(k);
 });
 addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
-addEventListener("blur", () => keys.clear());
+
+// Touch: hold the left or right half of the floor to turn that way, or both halves to walk forward.
+const touches = new Map(); // pointerId -> "left" | "right"
+const touchKeys = new Set();
+function updateTouch() {
+  const sides = new Set(touches.values());
+  touchKeys.clear();
+  if (sides.size === 2) touchKeys.add("fwd");
+  else for (const s of sides) touchKeys.add(s);
+}
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  if (e.pointerType !== "touch") return;
+  const r = renderer.domElement.getBoundingClientRect();
+  touches.set(e.pointerId, e.clientX < r.left + r.width / 2 ? "left" : "right");
+  updateTouch();
+});
+for (const type of ["pointerup", "pointercancel"]) {
+  renderer.domElement.addEventListener(type, (e) => { if (touches.delete(e.pointerId)) updateTouch(); });
+}
+renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault()); // a long press would open it
+const held = (k) => keys.has(k) || touchKeys.has(k);
+addEventListener("blur", () => { keys.clear(); touches.clear(); updateTouch(); });
 
 // Autopilot: plan a route around the walls on a fine grid, then follow it.
 const NAV = 0.25, NX = Math.round(W / NAV), NZ = Math.round(D / NAV);
@@ -1412,8 +1433,8 @@ function planRoute(from, boxes = walls.filter((w) => w.target > 0), holes = pits
 function steer(dt) {
   let turn = 0, move = 0;
   if (manual) {
-    turn = (keys.has("left") ? 1 : 0) - (keys.has("right") ? 1 : 0);
-    move = (keys.has("fwd") ? 1 : 0) - (keys.has("back") ? 1 : 0);
+    turn = (held("left") ? 1 : 0) - (held("right") ? 1 : 0);
+    move = (held("fwd") ? 1 : 0) - (held("back") ? 1 : 0);
     bot.heading += turn * TURN_RATE * dt;
   } else {
     if (routeIdx >= route.length && game.time - lastPlan > 1) {
@@ -1943,11 +1964,14 @@ $("tests").addEventListener("click", (e) => {
 });
 function showMenu() { renderMenu(); showSound(false); $("result").hidden = true; $("menu").hidden = false; fitMenu(); updateMusic(); }
 // Shrink the whole menu to fit the space under the sign rather than letting it scroll.
+const SHORT_SCREEN = "(max-height: 500px)"; // a phone held sideways; must match style.css
 function fitMenu() {
   const menu = $("menu"), frost = menu.querySelector(".frost");
   if (menu.hidden) return;
   frost.style.zoom = 1;
-  const room = menu.clientHeight * (1 - 0.31) - 16 - 32, wide = menu.clientWidth - 32;
+  // On a short screen the About card is centred over the sign (see style.css), so it gets the full height.
+  const centred = menu.classList.contains("about-open") && matchMedia(SHORT_SCREEN).matches;
+  const room = centred ? menu.clientHeight - 24 : menu.clientHeight * (1 - 0.31) - 16 - 32, wide = menu.clientWidth - 32;
   const scale = Math.min(1, room / frost.offsetHeight, wide / Math.max(frost.offsetWidth, frost.scrollWidth));
   frost.style.zoom = Math.max(0.4, scale).toFixed(3);
 }
@@ -2023,6 +2047,8 @@ function showView(name) {
     $(btn).setAttribute("aria-expanded", String(name === v));
     $(btn).title = $(btn).ariaLabel = name === v ? "Back to levels" : label;
   }
+  $("menu").classList.toggle("about-open", name === "about");
+  fitMenu();
 }
 function showSound(on) {
   if (on) { renderSound(); setErase(""); }
@@ -2792,7 +2818,7 @@ updateCamera(0, true);
 // Loaded: wait for Space (or a click or tap) before the title menu. That press also starts the audio.
 {
   const loading = $("loading");
-  loading.innerHTML = "<span>Press Space to start your shift.</span>";
+  loading.innerHTML = `<span>${matchMedia("(pointer: coarse)").matches ? "Tap" : "Press Space"} to start your shift.</span>`;
   loading.classList.add("ready");
   const start = (e) => {
     if (e.type === "keydown" && e.code !== "Space") return;

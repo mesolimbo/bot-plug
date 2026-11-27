@@ -35,6 +35,8 @@ Pass every level to unlock the map editor, then build, play-test, and share your
 
 ## Controls
 
+### Keyboard
+
 | Key | Action |
 | --- | --- |
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys | Walk and turn |
@@ -45,7 +47,18 @@ Pass every level to unlock the map editor, then build, play-test, and share your
 | <kbd>←</kbd> <kbd>→</kbd> | Previous or next level, in the map editor |
 | <kbd>Ctrl</kbd> <kbd>Z</kbd> | Undo, in the map editor |
 
-The game is for desktop browsers with a keyboard. It isn't built for phones.
+### Touch
+
+Hold your phone sideways (landscape).
+
+| Touch | Action |
+| --- | --- |
+| Hold the left side | Turn left |
+| Hold the right side | Turn right |
+| Hold both sides | Walk forward |
+| Menu, restart, and camera buttons | Menu, restart the level, and switch to the overhead camera |
+
+Everything else is a tap on its button. On a touch screen, the game's About page shows these touch tips instead of the keyboard keys.
 
 ## Run it locally
 

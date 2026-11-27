@@ -143,8 +143,20 @@ button, select, input, a, [tabindex] { outline: none; -webkit-tap-highlight-colo
    the space left below the sign above it and two thirds below it. */
 #menu::before { content: ""; flex: 1 1 calc(31% - 10px); }
 #menu::after { content: ""; flex: 2 1 16px; }
-#menu .frost { flex: 0 1 auto; min-height: 0; display: flex; width: min(780px, 100%); box-sizing: border-box; }
+#menu .frost { flex: 0 0 auto; min-height: 0; /* never squeezed: fitMenu() zooms it to fit instead */ display: flex; width: min(780px, 100%); box-sizing: border-box; }
 #menu .frost .card { width: 100%; max-height: none; overflow: visible; }
+/* A phone held sideways: drop the stage's minimum height and tighten the margins so nothing scrolls,
+   and centre the About card on the screen, over the sign, so its text has room. */
+@media (max-height: 500px) {
+  body { padding-block: 6px; }
+  .stage { min-height: 0; }
+  #menu.about-open::before, #menu.about-open::after { flex: 1 1 0; }
+  .hud { zoom: 0.72; }
+}
+/* Touch screens get touch tips in place of keyboard shortcuts. */
+@media (pointer: coarse) { .keys-only { display: none !important; } }
+@media not (pointer: coarse) { .touch-only { display: none !important; } }
+.shortcuts kbd svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 /* The menu card sits in the same kind of modelled steel frame as the HUD column. */
 .frost {
   padding: 6px; border: 14px solid transparent; border-image: url(assets/frame-menu.png) 28 / 14px stretch;
