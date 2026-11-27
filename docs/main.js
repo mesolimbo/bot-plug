@@ -1297,7 +1297,7 @@ addEventListener("keydown", (e) => {
     return;
   }
   // In the main menu, E opens the map editor.
-  if (e.code === "KeyE" && !$("menu").hidden && $("soundView").inert) { e.preventDefault(); openEditor(); return; }
+  if (e.code === "KeyE" && !$("menu").hidden && $("soundView").inert && editorUnlocked()) { e.preventDefault(); openEditor(); return; }
   // In the menu, 1-5 start that difficulty, as if its button were clicked.
   const digit = /^(Digit|Numpad)([1-5])$/.exec(e.code);
   if (digit && !$("menu").hidden && $("soundView").inert) {
@@ -1912,7 +1912,17 @@ $("actions").addEventListener("click", (e) => {
   if (act === "editor") openEditor();
 });
 
+// The map editor unlocks once every level has a best time, wherever the game runs. Opening the page with
+// ?editor unlocks it anyway, for working on levels. devServer: the local dev server, which can save them.
+let devServer = false;
+const editorForced = new URLSearchParams(location.search).has("editor");
+const editorUnlocked = () => editorForced || LEVELS.every((ls, k) => ls.every((_, l) => bestOf(k, l)));
+if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) {
+  fetch("/__dev/ping").then((r) => r.ok && r.json()).then((j) => { devServer = !!j?.save; renderMenu(); }).catch(() => {});
+}
 function renderMenu() {
+  $("editorBtn").disabled = !editorUnlocked();
+  $("editorBtn").title = editorUnlocked() ? "Map editor (E)" : "Complete all levels to unlock";
   $("tests").innerHTML = TESTS.map((t, k) => {
     // Levels passed in this difficulty, and the total of their best times.
     const times = LEVELS[k].map((_, l) => bestOf(k, l)).filter((v) => v);
@@ -2027,7 +2037,7 @@ $("soundBack").onclick = () => { showSound(false); $("settingsBtn").focus(); };
 const ED_VIEW = { x0: -ROOM.x, x1: ROOM.x, z0: -ROOM.z, z1: ROOM.z };
 const edCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 30);
 edCam.up.set(0, 0, -1);
-const ed = { k: 0, l: 0, canSave: false };
+const ed = { k: 0, l: 0 };
 const edBase = () => levelData.difficulties[ed.k].levels[ed.l];
 const edLevel = () => LEVELS[ed.k][ed.l];
 const edDirty = (k, l) => LEVELS[k][l].map.join("\n") !== levelData.difficulties[k].levels[l].join("\n");
@@ -2214,7 +2224,7 @@ function openEditor() {
   edSelect(game.test ?? ed.k, game.test === null ? ed.l : game.level);
   edMsg("");
   // Only the local dev server can save into the game's own files.
-  if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) fetch("/__dev/ping").then((r) => r.ok && r.json()).then((j) => { ed.canSave = !!j?.save; $("edSave").hidden = !ed.canSave; }).catch(() => {});
+  $("edSave").hidden = !devServer;
 }
 function closeEditor() {
   $("editor").hidden = true;

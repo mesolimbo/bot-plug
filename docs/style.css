@@ -318,3 +318,4 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 .menu-tools button:hover { background: none; filter: brightness(1.25); }
 .menu-tools button:active { filter: brightness(0.9); }
+.menu-tools button:disabled { opacity: 0.4; filter: grayscale(1); cursor: not-allowed; }
