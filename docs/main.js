@@ -1312,14 +1312,14 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
 
-// Touch: hold the left or right half of the floor to turn that way, or both halves to walk forward.
+// Touch: hold the left or right half of the floor to walk forward turning that way, or both halves to walk straight.
 const touches = new Map(); // pointerId -> "left" | "right"
 const touchKeys = new Set();
 function updateTouch() {
   const sides = new Set(touches.values());
   touchKeys.clear();
-  if (sides.size === 2) touchKeys.add("fwd");
-  else for (const s of sides) touchKeys.add(s);
+  if (sides.size) touchKeys.add("fwd");
+  if (sides.size === 1) for (const s of sides) touchKeys.add(s);
 }
 renderer.domElement.addEventListener("pointerdown", (e) => {
   if (e.pointerType !== "touch") return;

@@ -53,9 +53,9 @@ Hold your phone sideways (landscape).
 
 | Touch | Action |
 | --- | --- |
-| Hold the left side | Turn left |
-| Hold the right side | Turn right |
-| Hold both sides | Walk forward |
+| Hold the left side | Walk and turn left |
+| Hold the right side | Walk and turn right |
+| Hold both sides | Walk straight |
 | Menu, restart, and camera buttons | Menu, restart the level, and switch to the overhead camera |
 
 Everything else is a tap on its button. On a touch screen, the game's About page shows these touch tips instead of the keyboard keys.
