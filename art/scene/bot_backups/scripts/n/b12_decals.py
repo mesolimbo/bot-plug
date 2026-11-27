@@ -2,7 +2,7 @@
 # Run after b9_final.py (needs bot_new and bot_flap). Positions measured from the old model's texture.
 import os, shutil
 LOGOS = SP + r"\logos"
-SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene"
+SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene"
 for o in list(coll().objects):
     if o.name.startswith("decal_"):
         me = o.data
@@ -101,9 +101,9 @@ def shell_decal(name, src, lon, lat, width, nx=28, ny=16, lift=0.0004):
 # old: black W + text at lon 38..74, lat -6..9.5 (173 x 75 mm); yellow W at lon -71..-41, lat -4.5..6.5 (144 x 53 mm);
 # rear black W + text at lon -156..-126, lat -3..11.5 (140 x 68 mm). The new logos are less wide for their height, so each
 # keeps the old logo's centre and is sized between the old width and the old height.
-shell_decal("decal_abp_left", "decal_abp_black.png", LL[0], LL[1], LL[2])
-shell_decal("decal_abp_right", "decal_abp_yellow.png", LR[0], LR[1], LR[2])
-shell_decal("decal_abp_rear", "decal_abp_black.png", LB[0], LB[1], LB[2])
+shell_decal("decal_abp_left", "decal_abp_black.png", 56.0, 1.8, 0.150)
+shell_decal("decal_abp_right", "decal_abp_yellow.png", -56.0, 1.0, 0.120)
+shell_decal("decal_abp_rear", "decal_abp_black.png", -141.0, 4.3, 0.125)
 bmm.free()
 
 # bolt on the dust cover (flap-local coordinates: closed pose, origin on the hinge axis)

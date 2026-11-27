@@ -1,7 +1,7 @@
 # ---- finish: face texture, UVs, join into one skinned mesh (flap stays a separate bone-parented part), stats ----
 import shutil, os
-SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene"
-GAME_ASSETS = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\game\assets"
+SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene"
+GAME_ASSETS = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\docs\assets"
 for nm in ("bot_new", "bot_flap"):
     o = bpy.data.objects.get(nm)
     if o:
@@ -10,7 +10,7 @@ for nm in ("bot_new", "bot_flap"):
         if me.users == 0:
             bpy.data.meshes.remove(me)
 
-# face textures: copies of the extracted ones (the originals in game/assets are only read)
+# face textures: copies of the extracted ones (the originals in docs/assets are only read)
 for f in ("face_on.png", "face_off.png"):
     dst = os.path.join(SCENE_DIR, "bot_" + f)
     if not os.path.exists(dst):

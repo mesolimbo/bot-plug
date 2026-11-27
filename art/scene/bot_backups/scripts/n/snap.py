@@ -1,7 +1,7 @@
 # Save the working file and a numbered snapshot copy; keep the newest 8 snapshots; turn on Blender's auto-save.
 import bpy, os, re
-WORK = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\bot.blend"
-BK = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\bot_backups"
+WORK = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\bot.blend"
+BK = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\bot_backups"
 assert bpy.data.filepath.lower() == WORK.lower(), bpy.data.filepath
 os.makedirs(BK, exist_ok=True)
 fp = bpy.context.preferences.filepaths

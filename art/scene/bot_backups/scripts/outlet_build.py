@@ -18,8 +18,8 @@ import numpy as np
 
 D = r"C:\Users\mesol\AppData\Local\Temp\claude\3fec41d04d410712\f1237eee-dce1-4b40-88e6-7a7228eb5a6b\scratchpad\outlet"
 IMG = D + r"\outlet_tex.png"     # the concept with its receptacle shrunk to the bot socket's size (retex.py)
-OUT_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\outlet.blend"
-OUT_GLB = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\game\assets\outlet.glb"
+OUT_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\outlet.blend"
+OUT_GLB = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\docs\assets\outlet.glb"
 IW, IH = 1024, 1536
 S = 0.00036                # metres per concept pixel: the panel is 0.34 m wide, 0.49 m tall
 CX, CY = 510, 785          # receptacle centre in the concept

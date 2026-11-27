@@ -1,5 +1,5 @@
 # Append the plug model (read-only source) into a temporary collection and measure its pins.
-PLUG_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\plug.blend"
+PLUG_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\plug.blend"
 old_c = bpy.data.collections.get("tmp_plug")
 if old_c:
     for o in list(old_c.objects):

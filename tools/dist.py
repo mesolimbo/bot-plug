@@ -1,10 +1,11 @@
-"""Pack game/ into dist/alans-bot-plugs.zip for an itch.io HTML5 upload: index.html at the zip's root."""
+"""Pack docs/ (the game, as GitHub Pages serves it) into dist/alans-bot-plugs.zip for an itch.io HTML5 upload,
+with index.html at the zip's root."""
 import os
 import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GAME = os.path.join(ROOT, "game")
+GAME = os.path.join(ROOT, "docs")
 DIST = os.path.join(ROOT, "dist")
 OUT = os.path.join(DIST, "alans-bot-plugs.zip")
 SKIP = {".DS_Store", "Thumbs.db", "desktop.ini"}
@@ -12,7 +13,7 @@ SKIP = {".DS_Store", "Thumbs.db", "desktop.ini"}
 
 def main():
     if not os.path.isfile(os.path.join(GAME, "index.html")):
-        sys.exit("game/index.html not found")
+        sys.exit("docs/index.html not found")
     os.makedirs(DIST, exist_ok=True)
     count = 0
     # Already-compressed media gain nothing from deflate; store them so the zip builds fast.

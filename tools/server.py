@@ -7,9 +7,9 @@ import sys
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GAME = os.path.join(ROOT, "game")
-PIDFILE = os.path.join(ROOT, ".server.pid")
-LOGFILE = os.path.join(ROOT, ".server.log")
+GAME = os.path.join(ROOT, "docs")  # the game itself: served here, by GitHub Pages, and zipped for itch.io
+PIDFILE = os.path.join(ROOT, "tools", ".server.pid")
+LOGFILE = os.path.join(ROOT, "tools", ".server.log")
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8807"))
 URL = f"http://{HOST}:{PORT}/"
@@ -84,7 +84,7 @@ def status():
 
 
 def serve():
-    """Serve game/ and tell the browser not to cache, so a reload always picks up edits."""
+    """Serve docs/ and tell the browser not to cache, so a reload always picks up edits."""
     from functools import partial
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -105,8 +105,8 @@ def serve():
             self.end_headers()
             self.wfile.write(data)
 
-        # The map editor asks whether it can save here (only this local server answers; the itch.io build
-        # can't), then posts the whole levels file. The file is written as the editor formats it.
+        # The map editor asks whether it can save here (only this local server answers; GitHub Pages and itch.io
+        # can't), then posts the whole levels file, written to docs/levels.json as the editor formats it.
         def do_GET(self):
             if self.path == "/__dev/ping":
                 return self.reply(200, {"save": True})

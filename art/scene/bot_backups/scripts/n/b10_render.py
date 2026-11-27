@@ -114,7 +114,7 @@ bpy.context.view_layer.update()
 lit({"cover_open_side": ((-0.25, 3, 0.02), (-0.25, 0, 0.02), 0.30)})
 
 # plug seated (temporary copy of the game plug, removed afterwards)
-PLUG_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\plug.blend"
+PLUG_BLEND = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\plug.blend"
 with bpy.data.libraries.load(PLUG_BLEND, link=False) as (src, dst):
     dst.objects = [n for n in src.objects]
 tc = bpy.data.collections.new("tmp_plug")

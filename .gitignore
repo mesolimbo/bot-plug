@@ -1,7 +1,7 @@
-.server.pid
-.server.log
+tools/.server.pid
+tools/.server.log
 .playwright-mcp/
 *.blend1
 *.blend[0-9]
-scene/bot_backups/*.blend
+art/scene/bot_backups/*.blend
 dist/

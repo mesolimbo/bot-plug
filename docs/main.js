@@ -1291,6 +1291,8 @@ addEventListener("keydown", (e) => {
     const primary = !$("result").hidden && $("menu").hidden && $("actions").querySelector(".primary");
     if (primary && !e.target.closest?.("button")) { e.preventDefault(); primary.click(); return; }
   }
+  // In the main menu, E opens the map editor.
+  if (e.code === "KeyE" && !$("menu").hidden && $("soundView").inert) { e.preventDefault(); openEditor(); return; }
   // In the menu, 1-5 start that difficulty, as if its button were clicked.
   const digit = /^(Digit|Numpad)([1-5])$/.exec(e.code);
   if (digit && !$("menu").hidden && $("soundView").inert) {
@@ -2191,7 +2193,7 @@ function openEditor() {
   edSelect(game.test ?? ed.k, game.test === null ? ed.l : game.level);
   edMsg("");
   // Only the local dev server can save into the game's own files.
-  fetch("/__dev/ping").then((r) => r.ok && r.json()).then((j) => { ed.canSave = !!j?.save; $("edSave").hidden = !ed.canSave; }).catch(() => {});
+  if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) fetch("/__dev/ping").then((r) => r.ok && r.json()).then((j) => { ed.canSave = !!j?.save; $("edSave").hidden = !ed.canSave; }).catch(() => {});
 }
 function closeEditor() {
   $("editor").hidden = true;

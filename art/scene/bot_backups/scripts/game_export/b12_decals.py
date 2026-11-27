@@ -1,9 +1,8 @@
-LL, LR, LB = (88.0, 0.0, 0.200), (-88.0, 0.0, 0.200), (-145.5, -16.5, 0.125)  # rear: centred low on the right cheek
 # ---- decals: conforming meshes 0.4 mm above the surface, alpha-blended, riding the body bone (bolt rides the dust cover) ----
 # Run after b9_final.py (needs bot_new and bot_flap). Positions measured from the old model's texture.
 import os, shutil
 LOGOS = SP + r"\logos"
-SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene"
+SCENE_DIR = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene"
 for o in list(coll().objects):
     if o.name.startswith("decal_"):
         me = o.data

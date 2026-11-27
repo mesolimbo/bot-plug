@@ -1,5 +1,5 @@
 # ---- tidy and save scene/bot.blend (the original tripo-out file is never touched) ----------------------------
-OUT = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\scene\bot.blend"
+OUT = r"C:\Users\mesol\OneDrive\Documents\Art\2026\Alan's Bot Plugs\art\scene\bot.blend"
 assert bpy.data.filepath.lower() == OUT.lower(), bpy.data.filepath
 for nm in ("old_legL", "old_thighL", "old_shinL", "old_footL", "old_body", "b2_cam", "proj_cam"):
     o = bpy.data.objects.get(nm)
