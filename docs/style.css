@@ -158,6 +158,8 @@ button, select, input, a, [tabindex] { outline: none; -webkit-tap-highlight-colo
 .cog { position: absolute; top: 10px; right: 10px; z-index: 1; background: transparent; border-color: transparent; color: var(--muted); }
 .cog:hover, .cog[aria-expanded="true"] { background: #2b2930; color: var(--ink); }
 .cog svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.cog svg .dot { fill: currentColor; stroke: none; }
+.cog.info { right: auto; left: 10px; }  /* mirrors the settings gear */
 .sound { align-content: center; justify-items: center; gap: 18px; }
 .sound section { display: grid; justify-items: center; gap: 10px; }
 .sound h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -212,6 +214,29 @@ button.danger.strong:hover { background: #dc4248; }
 /* A wider gap where a key meets the text: after D, and either side of Esc. */
 .keys kbd:nth-of-type(4) { margin-right: 7px; }
 .keys kbd:nth-of-type(5) { margin-inline: 7px; }
+
+/* About: the same headings, keycaps and Back button as the other menu views. */
+/* Two columns, the story and the controls, so it's no taller than the levels view. */
+.about { grid-template-columns: 1fr auto; align-content: center; column-gap: 20px; row-gap: 12px; padding-left: 34px; padding-right: 0; }
+.about section { display: grid; align-content: start; gap: 8px; }
+.about h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.about p { margin: 0; color: var(--ink); font-size: 0.84rem; line-height: 1.45; text-wrap: pretty; }
+.about p b { font-family: var(--display); font-weight: 600; letter-spacing: 0.03em; }
+.about p em { font-style: normal; color: var(--hazard); }
+.shortcuts { display: grid; grid-template-columns: auto auto; gap: 6px 12px; align-items: center; margin: 0; font-size: 0.82rem; }
+.shortcuts dt { justify-self: end; display: flex; align-items: center; gap: 2px; color: var(--muted); }
+.shortcuts dt span { margin-inline: 4px; font-size: 0.8rem; }
+.shortcuts dd { margin: 0; color: var(--ink); }
+.shortcuts kbd {
+  display: inline-grid; place-items: center; box-sizing: border-box; min-width: 24px; height: 24px; padding: 0 1px;
+  border: 6px solid transparent; border-image: url(assets/keycap.png) 24 fill / 6px stretch;
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 600; line-height: 1; color: var(--ink); text-shadow: 0 1px 0 #0d0a0c;
+}
+.about-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.about-foot button { min-width: 120px; font-weight: 600; background: var(--hazard); border-color: var(--hazard); color: #18160f; border-radius: 9px 2px 9px 2px; }
+.about .legal { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.about .legal a { color: var(--hazard); text-decoration: none; border-bottom: 1px solid rgb(242 183 5 / 0.45); }
+.about .legal a:hover { border-bottom-color: var(--hazard); }
 .verdict { font-family: var(--display); font-weight: 700; font-size: 2.2rem; letter-spacing: 0.08em; margin: 0; }
 .verdict.pass { color: #5fd37a; }
 .verdict.fail { color: #e5484d; }

@@ -60,6 +60,9 @@
   <div class="overlay" id="menu" hidden>
     <div class="frost">
       <div class="card">
+        <button id="aboutBtn" class="icon cog info" aria-label="About" title="About" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle class="dot" cx="12" cy="7.6" r="1.2"/></svg>
+        </button>
         <button id="settingsBtn" class="icon cog" aria-label="Settings" title="Settings" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
@@ -86,6 +89,30 @@
             </div>
           </section>
           <div class="actions"><button id="soundBack" class="primary">Back</button></div>
+        </div>
+        <div class="view about" id="aboutView" inert>
+          <section>
+            <h2>About</h2>
+            <p>Welcome to the test floor at <b>Alan’s <em>Bot Plug</em></b> factory. You’re a quality control bot responsible for testing the strength of Alan’s Bot Plugs. Each shift, you wind through a series of mazes, walking start to finish while plugged into the wall by your power&nbsp;cable.</p>
+            <p>The cable is only a little longer than the right way through: that’s the slack. Take the long way round, and the plug pops out. Mind the pits, too. Clear all ten mazes of a given difficulty to finish your shift.</p>
+            <p>Pass every level to unlock the map editor, then build, play-test, and share your own mazes!</p>
+          </section>
+          <section>
+            <h2>Controls</h2>
+            <dl class="shortcuts">
+              <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Walk and turn (or arrows)</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Menu, or back</dd>
+              <dt><kbd>Enter</kbd></dt><dd>Yellow button action</dd>
+              <dt><kbd>1</kbd><span>–</span><kbd>5</kbd></dt><dd>Pick a difficulty</dd>
+              <dt><kbd>E</kbd></dt><dd>Map editor</dd>
+              <dt><kbd>&larr;</kbd><kbd>&rarr;</kbd></dt><dd>Editor: change level</dd>
+              <dt><kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Editor: undo</dd>
+            </dl>
+          </section>
+          <div class="about-foot">
+            <p class="legal">Copyright 2026 · <a href="https://github.com/mesolimbo/bot-plug/blob/main/LICENSE" target="_blank" rel="noopener">License</a></p>
+            <button id="aboutBack" class="primary">Back</button>
+          </div>
         </div>
       </div>
     </div>

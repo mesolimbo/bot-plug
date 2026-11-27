@@ -1297,10 +1297,10 @@ addEventListener("keydown", (e) => {
     return;
   }
   // In the main menu, E opens the map editor.
-  if (e.code === "KeyE" && !$("menu").hidden && $("soundView").inert && editorUnlocked()) { e.preventDefault(); openEditor(); return; }
+  if (e.code === "KeyE" && !$("menu").hidden && !$("mainView").inert && editorUnlocked()) { e.preventDefault(); openEditor(); return; }
   // In the menu, 1-5 start that difficulty, as if its button were clicked.
   const digit = /^(Digit|Numpad)([1-5])$/.exec(e.code);
-  if (digit && !$("menu").hidden && $("soundView").inert) {
+  if (digit && !$("menu").hidden && !$("mainView").inert) {
     e.preventDefault();
     $("tests").querySelector(`.test[data-k="${digit[2] - 1}"]`)?.click();
     return;
@@ -1953,7 +1953,7 @@ function fitMenu() {
 }
 addEventListener("resize", fitMenu);
 function toggleMenu() {
-  if (!$("menu").hidden && !$("soundView").inert) { showSound(false); return; }
+  if (!$("menu").hidden && $("mainView").inert) { showView("main"); return; }
   if (!$("menu").hidden && game.test !== null) { $("menu").hidden = true; updateMusic(); return; }
   showMenu();
 }
@@ -2016,15 +2016,23 @@ $("eraseYes").onclick = () => {
   renderMenu(); updateLevelButtons();
   setErase("done"); $("soundBack").focus();
 };
+// The menu card shows one view at a time: the levels ("main"), settings ("sound") or about.
+function showView(name) {
+  for (const v of ["main", "sound", "about"]) $(`${v}View`).inert = v !== name;
+  for (const [btn, v, label] of [["settingsBtn", "sound", "Settings"], ["aboutBtn", "about", "About"]]) {
+    $(btn).setAttribute("aria-expanded", String(name === v));
+    $(btn).title = $(btn).ariaLabel = name === v ? "Back to levels" : label;
+  }
+}
 function showSound(on) {
   if (on) { renderSound(); setErase(""); }
-  $("mainView").inert = on; $("soundView").inert = !on;
-  $("settingsBtn").setAttribute("aria-expanded", String(on));
-  $("settingsBtn").title = $("settingsBtn").ariaLabel = on ? "Back to levels" : "Settings";
+  showView(on ? "sound" : "main");
   if (on) $("soundView").querySelector("input")?.focus();
 }
 $("settingsBtn").onclick = () => showSound($("soundView").inert);
-$("soundBack").onclick = () => { showSound(false); $("settingsBtn").focus(); };
+$("soundBack").onclick = () => showSound(false);
+$("aboutBtn").onclick = () => showView($("aboutView").inert ? "about" : "main");
+$("aboutBack").onclick = () => showView("main");
 
 // --- Map editor ------------------------------------------------------------------------------------
 // The real maze, seen straight down through an orthographic camera, with an SVG laid over it in world
