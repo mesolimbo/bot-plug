@@ -14,7 +14,7 @@ const stage = $("stage");
 const ROOM = { x: 11, z: 7, h: 11 };
 const CELL = 2, MAZE_X0 = -9, MAZE_Z0 = -7, COLS = 9, ROWS = 7;
 const GOAL_X = 9.3;
-const START = new THREE.Vector3(-9.45, 0, 0);
+const START = new THREE.Vector3(-9.45, 0, 0);    // the start spot for the middle row; startOf moves it to the entrance
 const SOCKET_POS = new THREE.Vector3(-ROOM.x, 0.75, 0);
 const WALL_H = 1.3, WALL_T = 0.26;
 
@@ -33,25 +33,26 @@ const POST = 0.34;                   // square posts at wall ends and junctions,
 // and it runs out. Each maze is drawn as text, one string per line (see parseMap); the map editor writes
 // the same file.
 const PIT_INSET = 0.25, PIT_DEPTH = 1.3;
-const IN_ROW = 3;                    // the entrance faces the start zone (z = 0)
+const IN_ROW = 3;                    // the middle row, where entrances were before they could move
 const LEVEL_COUNT = 10;
 const levelData = await (await fetch("levels.json", { cache: "no-store" })).json();
 const TESTS = levelData.difficulties.map(({ name, level, hex, spare }) => ({ name, level, hex, spare }));
 
 // A maze as text: 2 * ROWS + 1 lines of 2 * COLS + 1 characters. Even lines hold the wall ends ("+") and
 // the walls across ("-"); odd lines hold the walls up and down ("|") and the cells, " " for floor or "O"
-// for a pit. The top and bottom lines are the room's walls. The gap in the left edge is the entrance (it
-// must be row 3) and the gap in the right edge is the exit. Pit squares joined through open edges make one
+// for a pit. The top and bottom lines are the room's walls. The gap in the left edge is the entrance and
+// the gap in the right edge is the exit; the bot starts across from the entrance. Pit squares joined through open edges make one
 // hole, however many there are; a wall between two pit squares keeps a strip of floor under it.
 function parseMap(lines) {
   if (lines.length !== 2 * ROWS + 1 || lines.some((l) => l.length !== 2 * COLS + 1)) throw new Error("wrong size");
   const v = [], h = [], pit = new Set(), key = (c, r) => c * 100 + r;
-  let exit = -1;
+  let exit = -1, entry = -1;
   for (let r = 0; r < ROWS; r++) {
     const line = lines[2 * r + 1];
     for (let i = 0; i <= COLS; i++) if (line[2 * i] === "|") v.push([i, r, r]);
     for (let c = 0; c < COLS; c++) if (line[2 * c + 1] === "O") pit.add(key(c, r));
     if (line[2 * COLS] !== "|") exit = r;
+    if (line[0] !== "|") entry = r;
   }
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) if (lines[2 * j][2 * c + 1] === "-") h.push([j, c, c]);
   const wallV = (i, r) => lines[2 * r + 1][2 * i] === "|", wallH = (j, c) => lines[2 * j][2 * c + 1] === "-";
@@ -88,9 +89,11 @@ function parseMap(lines) {
       minZ: Math.min(...rects.map((b) => b.minZ)), maxZ: Math.max(...rects.map((b) => b.maxZ)),
     });
   }
-  return { v, h, pits, exit, entry: lines[2 * IN_ROW + 1][0] === "|" ? -1 : IN_ROW };
+  return { v, h, pits, exit, entry };
 }
 const makeLevel = (k, map) => ({ ...TESTS[k], map, ...parseMap(map) });
+// Where the bot starts: in the start zone, across from the level's entrance.
+const startOf = (t) => new THREE.Vector3(START.x, 0, MAZE_Z0 + ((t.entry < 0 ? IN_ROW : t.entry) + 0.5) * CELL);
 const LEVELS = levelData.difficulties.map((d, k) => d.levels.map((map) => makeLevel(k, map)));
 
 // --- Renderer, scene, camera ------------------------------------------------------------------
@@ -181,9 +184,9 @@ const floorTex = canvasTex(W * PX, D * PX, (g, w, h) => {
     g.fillStyle = color; g.font = `700 ${size * PX}px "Chakra Petch", sans-serif`;
     g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 0, 0); g.restore();
   };
-  stencil("START", -10, -4.2, 0.9, -Math.PI / 2, "rgba(242,183,5,0.85)");
-  stencil("GOAL", 10, -3.6, 1.1, Math.PI / 2, "rgba(16,18,22,0.85)");
-  stencil("GOAL", 10, 3.6, 1.1, Math.PI / 2, "rgba(16,18,22,0.85)");
+  // One big word in the middle of each zone, running along it and filling most of its width.
+  stencil("START", -10, 0, 1.75, -Math.PI / 2, "rgba(242,183,5,0.85)");
+  stencil("GOAL", 10, 0, 1.75, Math.PI / 2, "rgba(16,18,22,0.85)");
   // Wall slots: every line a maze wall can rise from, so the floor always matches the walls.
   const slot = (x0, z0, x1, z1) => {
     const t = 0.32 * PX;
@@ -207,6 +210,14 @@ const floorTex = canvasTex(W * PX, D * PX, (g, w, h) => {
   }
 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), toon({ map: floorTex }));
+// In the map editor the floor is seen from high above, so its texture is shrunk a long way and the GPU
+// reads a blurry smaller copy. floorSharpen biases that choice towards the sharper copies while editing.
+const floorSharpen = { value: 0 };
+floor.material.onBeforeCompile = (sh) => {
+  sh.uniforms.floorSharpen = floorSharpen;
+  sh.fragmentShader = "uniform float floorSharpen;\n" + sh.fragmentShader.replace("#include <map_fragment>",
+    "vec4 sampledDiffuseColor = texture2D( map, vMapUv, floorSharpen );\ndiffuseColor *= sampledDiffuseColor;");
+};
 floor.rotation.x = -Math.PI / 2; // until buildPits gives it holes, laid out in world space
 floor.receiveShadow = true;
 scene.add(floor);
@@ -216,7 +227,7 @@ scene.add(floor);
 // on it): the floor is the grid's solid cells merged into rectangles, the pit bottom its hole cells, the
 // shaft walls stand along every edge between the two, and a hazard rim one cell wide runs round the
 // opening, its stripes laid in world space so they meet cleanly at every corner.
-let pits = [], pitBoxes = [];
+let pits = [];
 const pitGroup = new THREE.Group();
 scene.add(pitGroup);
 const PIT_RES = 0.125, PNX = Math.round(W / PIT_RES), PNZ = Math.round(D / PIT_RES);
@@ -325,7 +336,7 @@ function wallGeometry(edges, y0, y1, uLen, vLen) {
 }
 function buildPits(list) {
   pits = list;
-  pitBoxes = list.flatMap((p) => p.rects);
+  pitCores = ropeCores(list);
   for (const o of [...pitGroup.children]) { o.geometry?.dispose(); pitGroup.remove(o); }
   const hole = holeGrid(list), isHole = (ix, iz) => hole[iz * PNX + ix] === 1;
   // The floor: the room's plane less the holes, with the plane's own texture mapping.
@@ -799,6 +810,31 @@ const tailPins = () => [botEnd.clone().addScaledVector(botDir, 0.13), botEnd.clo
 // Keep a rope point ROPE_D from every wall and pit opening, with corners rounded off, and outside the bot when close
 // to him along the cable. Walls are at least 0.43 m thick with that margin and points move at most
 // STEP_MAX at a time, so a point can never be pushed out through the far side.
+// The rope keeps PIT_ROPE_GAP clear of a hole and rounds its corners to PIT_ROPE_R, so it sweeps round
+// them in a wide curve. A hole is made of several rectangles; only their outer sides are pulled in to round
+// them, so the rope runs straight past the joins between them.
+const PIT_ROPE_R = 0.45, PIT_ROPE_GAP = 0.1;
+let pitCores = [];
+function ropeCores(list) {
+  const k = PIT_ROPE_R - PIT_ROPE_GAP, e = 1e-6, out = [];
+  for (const pit of list) {
+    const rs = pit.rects;
+    const shared = (b, side) => rs.some((o) => o !== b && (
+      side === 0 ? Math.abs(o.maxX - b.minX) < e && o.minZ <= b.minZ + e && o.maxZ >= b.maxZ - e
+        : side === 1 ? Math.abs(o.minX - b.maxX) < e && o.minZ <= b.minZ + e && o.maxZ >= b.maxZ - e
+          : side === 2 ? Math.abs(o.maxZ - b.minZ) < e && o.minX <= b.minX + e && o.maxX >= b.maxX - e
+            : Math.abs(o.minZ - b.maxZ) < e && o.minX <= b.minX + e && o.maxX >= b.maxX - e));
+    for (const b of rs) {
+      let x0 = b.minX + (shared(b, 0) ? 0 : k), x1 = b.maxX - (shared(b, 1) ? 0 : k);
+      let z0 = b.minZ + (shared(b, 2) ? 0 : k), z1 = b.maxZ - (shared(b, 3) ? 0 : k);
+      if (x0 > x1) x0 = x1 = (b.minX + b.maxX) / 2;
+      if (z0 > z1) z0 = z1 = (b.minZ + b.maxZ) / 2;
+      out.push({ x0, x1, z0, z1, d: PIT_ROPE_R });
+    }
+  }
+  return out;
+}
+const wallCore = (w) => ({ x0: w.minX + ROPE_K, x1: w.maxX - ROPE_K, z0: w.minZ + ROPE_K, z1: w.maxZ - ROPE_K, d: ROPE_D });
 function pushRope(p, nearBot) {
   if (nearBot) {
     const dx = p.x - bot.pos.x, dz = p.y - bot.pos.z, d = Math.hypot(dx, dz);
@@ -808,17 +844,18 @@ function pushRope(p, nearBot) {
   }
   for (let pass = 0; pass < 2; pass++) {
     let moved = false;
-    for (const w of pitBoxes.length ? wallsNear(p.x, p.y).concat(pitBoxes) : wallsNear(p.x, p.y)) {
-      const x0 = w.minX + ROPE_K, x1 = w.maxX - ROPE_K, z0 = w.minZ + ROPE_K, z1 = w.maxZ - ROPE_K;
+    const near = wallsNear(p.x, p.y).map(wallCore);
+    for (const c of pitCores) if (p.x > c.x0 - c.d && p.x < c.x1 + c.d && p.y > c.z0 - c.d && p.y < c.z1 + c.d) near.push(c);
+    for (const { x0, x1, z0, z1, d: R } of near) {
       const cx = THREE.MathUtils.clamp(p.x, x0, x1), cz = THREE.MathUtils.clamp(p.y, z0, z1);
       const dx = p.x - cx, dz = p.y - cz, d2 = dx * dx + dz * dz;
-      if (d2 >= ROPE_D * ROPE_D) continue;
+      if (d2 >= R * R) continue;
       moved = true;
       if (d2 > 1e-12) {
         const d = Math.sqrt(d2);
-        p.x = cx + (dx / d) * ROPE_D; p.y = cz + (dz / d) * ROPE_D;
+        p.x = cx + (dx / d) * R; p.y = cz + (dz / d) * R;
       } else {
-        const opts = [[x0 - ROPE_D - p.x, 0], [x1 + ROPE_D - p.x, 0], [0, z0 - ROPE_D - p.y], [0, z1 + ROPE_D - p.y]];
+        const opts = [[x0 - R - p.x, 0], [x1 + R - p.x, 0], [0, z0 - R - p.y], [0, z1 + R - p.y]];
         opts.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
         p.x += opts[0][0]; p.y += opts[0][1];
       }
@@ -1217,7 +1254,21 @@ addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); if (!$("editor").hidden) closeEditor(); else toggleMenu(); return; }
-  if (!$("editor").hidden) return;
+  if (!$("editor").hidden) {
+    // Left and right step through every level, on into the next difficulty and round from the last to the first.
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[e.code];
+    if (step && !e.target.closest?.("select")) {
+      e.preventDefault();
+      const n = TESTS.length * LEVEL_COUNT, i = (ed.k * LEVEL_COUNT + ed.l + step + n) % n;
+      edSelect(Math.floor(i / LEVEL_COUNT), i % LEVEL_COUNT);
+    }
+    return;
+  }
+  // On the results card, Enter presses its yellow button (Next after a pass, Retry after a fail).
+  if (e.code === "Enter" || e.code === "NumpadEnter") {
+    const primary = !$("result").hidden && $("menu").hidden && $("actions").querySelector(".primary");
+    if (primary && !e.target.closest?.("button")) { e.preventDefault(); primary.click(); return; }
+  }
   // In the menu, 1-5 start that difficulty, as if its button were clicked.
   const digit = /^(Digit|Numpad)([1-5])$/.exec(e.code);
   if (digit && !$("menu").hidden && $("soundView").inert) {
@@ -1763,7 +1814,7 @@ function startTest(k, l, withIntro = false) {
   if (unplugged) replug();
   buildPits(t.pits);
   power = 1;
-  bot.pos.copy(START); bot.heading = 0; bot.weight = 0;
+  bot.pos.copy(startOf(t)); bot.heading = 0; bot.weight = 0;
   botRoot.position.copy(bot.pos); botRoot.rotation.y = 0;
   updateCamera(0, true);
   restorePose(); mixer.update(0); savePose();
@@ -1939,7 +1990,8 @@ $("soundBack").onclick = () => { showSound(false); $("settingsBtn").focus(); };
 // --- Map editor ------------------------------------------------------------------------------------
 // The real maze, seen straight down through an orthographic camera, with an SVG laid over it in world
 // metres (x across, z down the screen). Clicking between two squares adds or removes a wall, on a square
-// adds or removes a pit, and on the right-hand edge moves the exit there; walls rise and sink as in play.
+// adds or removes a pit, and on the left or right edge moves the entrance or the exit there (the bot
+// waits across from the entrance); walls rise and sink as in play.
 // Edits change the level in play straight away (so Play test uses them) and are kept until the page
 // reloads. Export and import move one level through a file; on the local dev server, Save to game writes
 // every level back to levels.json.
@@ -1962,11 +2014,13 @@ function edShow(fresh) {
     if (fall) endFall();
     if (unplugged) replug();
     power = 1;
-    bot.pos.copy(START); bot.heading = 0; bot.weight = 0;
-    botRoot.position.copy(bot.pos); botRoot.rotation.set(0, 0, 0);
+    bot.heading = 0; bot.weight = 0;
+    botRoot.rotation.set(0, 0, 0);
     restorePose(); mixer.update(0); savePose();
     cableMat.color.set(t.hex);
   }
+  // He waits across from the entrance, wherever it has been moved to.
+  bot.pos.copy(startOf(t)); botRoot.position.copy(bot.pos);
   buildWalls(t);
   buildPits(t.pits);
   rope = makeRope(Number.isFinite(t.len) ? t.len : 30);
@@ -2001,9 +2055,14 @@ function edClick(e) {
   if (a === "v") edPoke(2 * y + 1, 2 * x, map[2 * y + 1][2 * x] === "|" ? " " : "|");
   if (a === "h") edPoke(2 * y, 2 * x + 1, map[2 * y][2 * x + 1] === "-" ? " " : "-");
   if (a === "p") edPoke(2 * y + 1, 2 * x + 1, map[2 * y + 1][2 * x + 1] === "O" ? " " : "O");
-  if (a === "x") {
+  if (a === "x" || a === "e") {
+    // One gap on that edge: the exit on the right, the entrance on the left. A pit on the new entrance
+    // square is filled in, so he never starts by walking into one.
     const next = map.slice();
-    for (let r = 0; r < ROWS; r++) { const n = 2 * r + 1; next[n] = next[n].slice(0, 2 * COLS) + (r === y ? " " : "|"); }
+    for (let r = 0; r < ROWS; r++) {
+      const n = 2 * r + 1, ch = r === y ? " " : "|";
+      next[n] = a === "x" ? next[n].slice(0, 2 * COLS) + ch : ch + (r === y ? " " : next[n][1]) + next[n].slice(2);
+    }
     edSetMap(next);
   }
   edMsg("");
@@ -2016,7 +2075,7 @@ function edRender() {
   const t = edLevel(), map = t.map, svg = [];
   const X = (i) => MAZE_X0 + i * CELL, Z = (j) => MAZE_Z0 + j * CELL, f = (v) => v.toFixed(2);
   // The right way through, as the autopilot would walk it.
-  const route = planRoute(START, wallBoxes(t), t.pits).points;
+  const route = planRoute(startOf(t), wallBoxes(t), t.pits).points;
   if (route.length) {
     const pts = route.map((p) => `${f(p.x)},${f(p.y)}`).join(" ");
     svg.push(`<polyline points="${pts}" fill="none" stroke="#101114" stroke-width="0.28" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>`);
@@ -2024,7 +2083,7 @@ function edRender() {
   }
   // Click targets: squares (not the entrance square), inside edges, and the right-hand edge for the exit.
   for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
-    if (c === 0 && r === IN_ROW) continue;
+    if (c === 0 && r === t.entry) continue;
     const tip = map[2 * r + 1][2 * c + 1] === "O" ? "Fill in the pit" : "Open a pit";
     svg.push(`<rect class="cellhit" data-a="p,${c},${r}" x="${f(X(c) + 0.45)}" y="${f(Z(r) + 0.45)}" width="${CELL - 0.9}" height="${CELL - 0.9}" rx="0.15"><title>${tip}</title></rect>`);
   }
@@ -2032,6 +2091,7 @@ function edRender() {
   for (let i = 1; i < COLS; i++) for (let r = 0; r < ROWS; r++) hit(`v,${i},${r}`, X(i), Z(r) + 0.35, X(i), Z(r + 1) - 0.35, map[2 * r + 1][2 * i] === "|" ? "Remove the wall" : "Add a wall");
   for (let j = 1; j < ROWS; j++) for (let c = 0; c < COLS; c++) hit(`h,${c},${j}`, X(c) + 0.35, Z(j), X(c + 1) - 0.35, Z(j), map[2 * j][2 * c + 1] === "-" ? "Remove the wall" : "Add a wall");
   for (let r = 0; r < ROWS; r++) if (r !== t.exit) hit(`x,${COLS},${r}`, X(COLS), Z(r) + 0.35, X(COLS), Z(r + 1) - 0.35, "Move the exit here");
+  for (let r = 0; r < ROWS; r++) if (r !== t.entry) hit(`e,0,${r}`, X(0), Z(r) + 0.35, X(0), Z(r + 1) - 0.35, "Move the entrance here");
   const el = $("edGrid");
   el.setAttribute("viewBox", `${ED_VIEW.x0} ${ED_VIEW.z0} ${ED_VIEW.x1 - ED_VIEW.x0} ${ED_VIEW.z1 - ED_VIEW.z0}`);
   el.innerHTML = svg.join("");
@@ -2108,14 +2168,85 @@ $("edGrid").addEventListener("click", edClick);
 $("edDiff").onchange = () => { edSelect(Number($("edDiff").value), ed.l); $("edDiff").blur(); };
 $("edLevel").onchange = () => { edSelect(ed.k, Number($("edLevel").value)); $("edLevel").blur(); };
 $("edRevert").onclick = () => { edSetMap(edBase().slice()); edMsg("Level put back as saved."); };
+// A random maze for the selected difficulty, its entrance and exit on random rows, made the way the
+// original levels were: a full maze, then extra openings that each add a second way through 3 to 8
+// squares longer than the right one, then pits on squares off the right way (next to it where possible),
+// some two squares wide.
+function randomMap(k) {
+  const rand = Math.random, loops = [3, 4, 5, 6, 7][k], pitCount = [1, 2, 2, 3, 3][k], wide = [0, 0.3, 0.45, 0.55, 0.7][k];
+  const vW = Array.from({ length: COLS + 1 }, () => Array(ROWS).fill(true));
+  const hW = Array.from({ length: ROWS + 1 }, () => Array(COLS).fill(true));
+  const inRow = Math.floor(rand() * ROWS);
+  const seen = Array.from({ length: COLS }, () => Array(ROWS).fill(false)), stack = [[0, inRow]];
+  seen[0][inRow] = true;
+  while (stack.length) {
+    const [c, r] = stack[stack.length - 1];
+    const next = [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]].filter(([x, y]) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !seen[x][y]);
+    if (!next.length) { stack.pop(); continue; }
+    const [x, y] = next[Math.floor(rand() * next.length)];
+    if (x !== c) vW[Math.max(x, c)][r] = false; else hW[Math.max(y, r)][c] = false;
+    seen[x][y] = true;
+    stack.push([x, y]);
+  }
+  vW[0][inRow] = false;
+  const out = Math.floor(rand() * ROWS);
+  vW[COLS][out] = false;
+  const ways = (c, r) => [[c + 1, r, c + 1 < COLS && !vW[c + 1][r]], [c - 1, r, c > 0 && !vW[c][r]], [c, r + 1, r + 1 < ROWS && !hW[r + 1][c]], [c, r - 1, r > 0 && !hW[r][c]]].filter((n) => n[2]);
+  const dist = (c0, r0) => {
+    const d = Array.from({ length: COLS }, () => Array(ROWS).fill(Infinity)), q = [[c0, r0]];
+    d[c0][r0] = 0;
+    while (q.length) {
+      const [c, r] = q.shift();
+      for (const [x, y] of ways(c, r)) if (d[x][y] === Infinity) { d[x][y] = d[c][r] + 1; q.push([x, y]); }
+    }
+    return d;
+  };
+  for (let made = 0, tries = 0; made < loops && tries < 4000; tries++) {
+    const dE = dist(0, inRow), dX = dist(COLS - 1, out), best = dE[COLS - 1][out];
+    const vertical = rand() < 0.5;
+    const i = 1 + Math.floor(rand() * (vertical ? COLS - 1 : ROWS - 1)), j = Math.floor(rand() * (vertical ? ROWS : COLS));
+    if (vertical ? !vW[i][j] : !hW[i][j]) continue;
+    const [ac, ar, bc, br] = vertical ? [i - 1, j, i, j] : [j, i - 1, j, i];
+    const via = Math.min(dE[ac][ar] + 1 + dX[bc][br], dE[bc][br] + 1 + dX[ac][ar]);
+    if (via - best < 3 || via - best > 8) continue;
+    if (vertical) vW[i][j] = false; else hW[i][j] = false;
+    made++;
+  }
+  const dE = dist(0, inRow), dX = dist(COLS - 1, out), best = dE[COLS - 1][out];
+  const onRoute = (c, r) => dE[c][r] + dX[c][r] === best, key = (c, r) => c * 100 + r, taken = new Set(), pit = new Set();
+  const free = (c, r) => !onRoute(c, r) && !(c === 0 && r === inRow) && !(c === COLS - 1 && r === out) &&
+    [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => !taken.has(key(c + dx, r + dy)));
+  const cells = [];
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) cells.push([c, r]);
+  for (let g = 0; g < pitCount; g++) {
+    const pool = cells.filter(([c, r]) => free(c, r)), near = pool.filter(([c, r]) => ways(c, r).some(([x, y]) => onRoute(x, y)));
+    const from = near.length ? near : pool;
+    if (!from.length) break;
+    const [c, r] = from[Math.floor(rand() * from.length)], group = [[c, r]];
+    if (rand() < wide) {
+      const mates = ways(c, r).filter(([x, y]) => free(x, y));
+      if (mates.length) group.push(mates[Math.floor(rand() * mates.length)]);
+    }
+    for (const [x, y] of group) { taken.add(key(x, y)); pit.add(key(x, y)); }
+  }
+  const map = [];
+  for (let y = 0; y <= 2 * ROWS; y++) {
+    let line = "";
+    if (y % 2 === 0) for (let c = 0; c < COLS; c++) line += "+" + (y === 0 || y === 2 * ROWS || hW[y / 2][c] ? "-" : " ");
+    else for (let i = 0; i <= COLS; i++) line += (vW[i][(y - 1) / 2] ? "|" : " ") + (i < COLS ? (pit.has(key(i, (y - 1) / 2)) ? "O" : " ") : "");
+    map.push(y % 2 === 0 ? line + "+" : line);
+  }
+  return map;
+}
+$("edRandom").onclick = () => { edSetMap(randomMap(ed.k)); edMsg(`A new random ${TESTS[ed.k].level} maze. Revert level brings the saved one back.`); };
 // Clear: no walls inside and no pits; the room's walls, the entrance and the exit stay.
 $("edClear").onclick = () => {
-  const exit = edLevel().exit, map = [];
+  const { exit, entry } = edLevel(), map = [];
   for (let y = 0; y <= 2 * ROWS; y++) {
     if (y % 2 === 0) map.push("+" + (y === 0 || y === 2 * ROWS ? "-+" : " +").repeat(COLS));
     else {
       const r = (y - 1) / 2;
-      map.push((r === IN_ROW ? " " : "|") + " ".repeat(2 * COLS - 1) + (r === exit ? " " : "|"));
+      map.push((r === entry ? " " : "|") + " ".repeat(2 * COLS - 1) + (r === exit ? " " : "|"));
     }
   }
   edSetMap(map);
@@ -2145,7 +2276,7 @@ $("edFile").onchange = async () => {
     const data = JSON.parse(await file.text());
     const map = Array.isArray(data) ? data : data.map;
     const parsed = parseMap(map);
-    if (parsed.entry !== IN_ROW) throw new Error("the entrance must be open on row 4");
+    if (parsed.entry < 0) throw new Error("there is no entrance");
     if (parsed.exit < 0) throw new Error("there is no exit");
     edSetMap(map.slice());
     edMsg(`Imported ${file.name} into ${TESTS[ed.k].level} ${ed.l + 1}.`, "good");
@@ -2553,9 +2684,10 @@ resize();
 // A maze with no way through gets route Infinity.
 function measureLevel(t) {
   const boxes = wallBoxes(t);
-  const r = planRoute(START, boxes, t.pits);
+  const start = startOf(t);
+  const r = planRoute(start, boxes, t.pits);
   if (!r.points.length) { t.route = t.len = Infinity; return t; }
-  const line = new Taut(socketFoot(), new THREE.Vector2(START.x, START.z), wallCorners(boxes));
+  const line = new Taut(socketFoot(), new THREE.Vector2(start.x, start.z), wallCorners(boxes));
   for (const p of r.points.slice(1)) line.moveTo(p);
   t.route = line.length() + cableDrops();
   t.len = Math.ceil(t.route * (1 + t.spare) * 2) / 2;
@@ -2663,5 +2795,6 @@ renderer.setAnimationLoop(() => {
   // The editor looks down from below the sign, which would hide the maze's back row, so it's left out.
   const editing = !$("editor").hidden;
   signGltf.scene.visible = !editing;
+  floorSharpen.value = editing ? -1.5 : 0;
   if (editing) { edFrame(); renderer.render(scene, edCam); } else renderer.render(scene, camera);
 });
