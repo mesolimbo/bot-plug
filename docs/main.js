@@ -1272,11 +1272,20 @@ const keys = new Set();
 const KEYMAP = { KeyW: "fwd", ArrowUp: "fwd", KeyS: "back", ArrowDown: "back", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right",
 };
 addEventListener("keydown", (e) => {
-  if (e.target.closest?.("input, textarea") && !(e.code === "Escape" && e.target.type === "range")) return;
+  if (e.target.closest?.("input, textarea") && !(["Escape", "Enter", "NumpadEnter"].includes(e.code) && e.target.type === "range")) return;
   if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ" && !e.shiftKey && !$("editor").hidden) { e.preventDefault(); edUndoStep(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+R reloads) alone
   if ($("loading")) return; // nothing to drive or open until the test floor has loaded
   if (e.code === "Escape") { e.preventDefault(); if (!$("editor").hidden) closeEditor(); else toggleMenu(); return; }
+  // Enter presses the yellow button of whatever is open: Play test in the map editor, Back in settings,
+  // Next or Retry on the results card, even if another button was clicked last (focus is never shown, so
+  // Enter shouldn't depend on it; Space still presses the focused button). A dropdown keeps Enter for itself.
+  if ((e.code === "Enter" || e.code === "NumpadEnter") && !e.target.closest?.("select")) {
+    const scope = !$("editor").hidden ? $("editor") : !$("menu").hidden ? $("menu").querySelector(".view:not([inert])")
+      : !$("result").hidden ? $("actions") : null;
+    const primary = scope && [...scope.querySelectorAll(".primary")].find((b) => !b.disabled && b.offsetParent);
+    if (primary) { e.preventDefault(); primary.click(); return; }
+  }
   if (!$("editor").hidden) {
     // Left and right step through every level, on into the next difficulty and round from the last to the first.
     const step = { ArrowLeft: -1, ArrowRight: 1 }[e.code];
@@ -1286,11 +1295,6 @@ addEventListener("keydown", (e) => {
       edSelect(Math.floor(i / LEVEL_COUNT), i % LEVEL_COUNT);
     }
     return;
-  }
-  // On the results card, Enter presses its yellow button (Next after a pass, Retry after a fail).
-  if (e.code === "Enter" || e.code === "NumpadEnter") {
-    const primary = !$("result").hidden && $("menu").hidden && $("actions").querySelector(".primary");
-    if (primary && !e.target.closest?.("button")) { e.preventDefault(); primary.click(); return; }
   }
   // In the main menu, E opens the map editor.
   if (e.code === "KeyE" && !$("menu").hidden && $("soundView").inert) { e.preventDefault(); openEditor(); return; }
